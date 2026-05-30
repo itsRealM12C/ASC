@@ -3,30 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Advanced VS Code IDE Engine</title>
+    <title>BSCode Editor</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.6/ace.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.6/ext-language_tools.js"></script>
     <style>
         :root {
             --bg-main: #1e1e1e;
-            --bg-sidebar: #252526;
-            --bg-activity: #333333;
-            --bg-tabs: #2d2d2d;
+            --bg-tabs: #252526;
+            --bg-tab-inactive: #2d2d2d;
             --bg-tab-hover: #2b2d2e;
-            --border-color: #3e3e42;
+            --border-color: #333;
             --accent: #007acc;
             --accent-hover: #0062a3;
-            --text-main: #cccccc;
+            --text-main: #d4d4d4;
             --text-muted: #969696;
             --console-bg: #111111;
             --error-color: #f48771;
             --warn-color: #cca700;
             --shell-color: #4caf50;
-            --statusbar-bg: #007acc;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
         body, html {
             height: 100%;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -37,338 +40,775 @@
             overflow: hidden;
         }
 
-        /* Core Layout Grid */
-        .ide-container {
-            display: flex;
-            flex: 1;
-            height: calc(100% - 22px);
-            overflow: hidden;
-        }
-
-        /* Activity Bar (Far Left) */
-        .activity-bar {
-            width: 48px;
-            background-color: var(--bg-activity);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding-top: 10px;
-            z-index: 10;
-        }
-        .activity-icon {
-            color: var(--text-muted);
-            padding: 12px;
-            cursor: pointer;
-            transition: color 0.2s;
-        }
-        .activity-icon.active, .activity-icon:hover { color: white; border-left: 2px solid var(--accent); }
-
-        /* Sidebar (Explorer) */
-        .sidebar {
-            width: 200px;
-            background-color: var(--bg-sidebar);
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            transition: width 0.3s, opacity 0.3s;
-        }
-        .sidebar-header {
-            font-size: 11px;
-            text-transform: uppercase;
-            padding: 10px 15px;
-            color: var(--text-muted);
-            letter-spacing: 1px;
+        /* Header & Tabs */
+        .header {
             display: flex;
             justify-content: space-between;
-        }
-        .explorer-tree { flex: 1; overflow-y: auto; }
-        .file-item {
-            display: flex;
             align-items: center;
-            padding: 4px 15px;
-            cursor: pointer;
-            font-size: 13px;
-            color: var(--text-main);
-            gap: 8px;
-            user-select: none;
-        }
-        .file-item:hover { background-color: rgba(255, 255, 255, 0.05); }
-        .file-item.active { background-color: rgba(0, 122, 204, 0.2); color: white; }
-        .sidebar-actions { padding: 10px; display: flex; gap: 5px; border-top: 1px solid var(--border-color); }
-        .sidebar-actions button { flex: 1; background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: 3px; }
-        .sidebar-actions button:hover { background: var(--bg-tabs); color: white; }
-
-        @media (max-width: 600px) {
-            .sidebar { width: 0; opacity: 0; overflow: hidden; border: none; }
-            .sidebar.mobile-open { width: 200px; opacity: 1; position: absolute; left: 48px; height: 100%; z-index: 9; border-right: 1px solid var(--border-color); }
-        }
-
-        /* Editor Area */
-        .main-content {
-            display: flex;
-            flex-direction: column;
-            flex: 1;
-            min-width: 0;
-        }
-
-        /* Tabs */
-        .tabs-header {
-            display: flex;
-            background-color: var(--bg-main);
+            background-color: var(--bg-tabs);
+            border-bottom: 1px solid var(--border-color);
             overflow-x: auto;
             scrollbar-width: none;
+        }
+        .header::-webkit-scrollbar { display: none; }
+
+        .tabs-container {
+            display: flex;
+            flex-grow: 1;
+            align-items: flex-end;
             min-height: 40px;
         }
-        .tabs-header::-webkit-scrollbar { display: none; }
+
         .tab {
-            background-color: var(--bg-tabs);
+            background-color: var(--bg-tab-inactive);
             color: var(--text-muted);
-            border-right: 1px solid var(--bg-main);
-            padding: 8px 30px 8px 14px;
+            border: none;
+            padding: 8px 14px;
             cursor: pointer;
-            font-family: Consolas, monospace;
+            font-family: Consolas, 'Courier New', monospace;
             font-size: 13px;
+            border-top: 2px solid transparent;
+            border-right: 1px solid var(--border-color);
             display: flex;
             align-items: center;
             gap: 8px;
-            white-space: nowrap;
-            position: relative;
             user-select: none;
-            transition: transform 0.1s;
+            touch-action: none;
+            transition: background-color 0.2s, color 0.2s;
         }
-        .tab.active { background-color: var(--bg-main); color: white; border-top: 2px solid var(--accent); }
-        .tab.drag-over { opacity: 0.5; border-left: 2px solid var(--accent); }
-        
-        .tab-close {
-            position: absolute;
-            right: 6px;
-            width: 18px;
-            height: 18px;
-            border-radius: 3px;
+
+        .tab:hover { background-color: var(--bg-tab-hover); }
+        .tab.active {
+            background-color: var(--bg-main);
+            color: white;
+            border-top: 2px solid var(--accent);
+        }
+        .tab.dragging {
+            opacity: 0.5;
+            background-color: var(--accent);
+        }
+
+        .close-tab {
             display: flex;
             align-items: center;
             justify-content: center;
-            opacity: 0;
-            transition: opacity 0.2s, background 0.2s;
+            border-radius: 4px;
+            width: 16px;
+            height: 16px;
+            color: var(--text-muted);
+            transition: background-color 0.2s, color 0.2s;
         }
-        .tab:hover .tab-close, .tab.active .tab-close { opacity: 0.7; }
-        .tab-close:hover { opacity: 1 !important; background-color: rgba(255,255,255,0.1); }
+        .close-tab:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #ff5f56;
+        }
 
-        .toolbar {
+        .add-tab-btn {
+            background: transparent;
+            color: var(--text-muted);
+            border: none;
+            padding: 0 15px;
+            height: 40px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s;
+        }
+        .add-tab-btn:hover { color: white; }
+
+        .actions { 
+            display: flex; 
+            align-items: center; 
+            padding-right: 10px; 
+            gap: 6px;
+        }
+        
+        .actions button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            cursor: pointer;
+            border-radius: 3px;
+            font-weight: 600;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background-color 0.2s;
+        }
+        .actions button:hover { background-color: var(--accent-hover); }
+
+        /* Configuration Utility Bar */
+        .utility-bar {
             background-color: var(--bg-main);
-            padding: 5px 15px;
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
             border-bottom: 1px solid var(--border-color);
-        }
-        .run-btn { background: var(--accent); color: white; border: none; padding: 4px 12px; border-radius: 3px; cursor: pointer; display: flex; align-items: center; gap: 5px; font-weight: bold; }
-        .run-btn:hover { background: var(--accent-hover); }
-
-        /* Workspace Layout */
-        .workspace { display: flex; flex-direction: column; flex: 1; height: 100%; position: relative; }
-        @media (min-width: 768px) { .workspace { flex-direction: row; } }
-        
-        #editor-container { flex: 1; height: 50vh; position: relative; }
-        .editor-placeholder { display: flex; align-items: center; justify-content: center; height: 100%; width: 100%; color: var(--text-muted); font-size: 18px; font-weight: 300; opacity: 0.5; user-select: none; background: var(--bg-main); position: absolute; top: 0; left: 0; z-index: 5; text-align: center; padding: 20px; }
-        
-        @media (min-width: 768px) { #editor-container { height: 100%; width: 50%; border-right: 1px solid var(--border-color); } }
-
-        /* Output Viewports */
-        .output-panel { flex: 1; display: flex; flex-direction: column; background: var(--console-bg); height: 50vh; }
-        @media (min-width: 768px) { .output-panel { height: 100%; width: 50%; } }
-
-        .output-header {
-            background: var(--bg-sidebar);
+            padding: 4px 12px;
             display: flex;
-            border-bottom: 1px solid var(--border-color);
-            user-select: none;
-        }
-        .output-tab {
-            padding: 6px 16px;
+            gap: 15px;
+            align-items: center;
             font-size: 11px;
             color: var(--text-muted);
-            cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border-right: 1px solid var(--border-color);
         }
-        .output-tab.active { background: var(--console-bg); color: white; font-weight: bold; }
-        
-        .output-content { flex: 1; position: relative; display: none; overflow: auto; }
-        .output-content.active { display: block; }
+        .utility-bar label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+        .utility-bar select {
+            background: var(--bg-tabs);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            padding: 2px 4px;
+            outline: none;
+        }
 
-        #console-output { padding: 10px; font-family: Consolas, monospace; font-size: 13px; }
-        .log-line { padding: 3px 0; border-bottom: 1px solid #1c1c1c; word-wrap: break-word; white-space: pre-wrap; display: flex; gap: 6px; }
-        .log-error { color: var(--error-color); }
-        .log-warn { color: var(--warn-color); }
-        .log-system { color: #888; font-style: italic; }
-        .log-shell { color: var(--shell-color); font-weight: bold; }
-        
-        #live-preview-frame {
+        /* Work Area */
+        .workspace {
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+            height: calc(100% - 72px);
+        }
+        @media (min-width: 768px) {
+            .workspace { flex-direction: row; }
+        }
+
+        /* Editor Frame */
+        #editor {
+            flex: 1;
+            height: 50vh;
+            width: 100%;
+            position: relative;
+        }
+        @media (min-width: 768px) {
+            #editor { height: 100%; width: 50%; }
+        }
+
+        /* Fallback Textarea Engine */
+        #fallback-textarea {
             width: 100%;
             height: 100%;
+            background-color: var(--bg-main);
+            color: var(--text-main);
             border: none;
-            background: #ffffff;
+            padding: 15px;
+            font-family: Consolas, 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            resize: none;
+            outline: none;
         }
-        
-        /* Status Bar */
-        .status-bar {
-            height: 22px;
-            background-color: var(--statusbar-bg);
-            color: white;
+
+        /* Output Viewport & Console Layout */
+        .output-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-top: 2px solid var(--accent);
+            height: 50vh;
+            width: 100%;
+        }
+        @media (min-width: 768px) {
+            .output-panel { height: 100%; width: 50%; border-top: none; border-left: 2px solid var(--accent); }
+        }
+
+        #preview {
+            flex: 2;
+            width: 100%;
+            background: #fff;
+            border: none;
+        }
+
+        .console-container {
+            flex: 1;
+            background-color: var(--console-bg);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+        .console-header {
+            background: var(--bg-tabs);
+            padding: 6px 12px;
+            font-size: 12px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0 10px;
-            font-size: 11px;
-            user-select: none;
         }
-        .status-item { display: flex; align-items: center; gap: 5px; cursor: pointer; padding: 0 5px; height: 100%; }
-        .status-item:hover { background-color: rgba(255,255,255,0.2); }
+        .console-clear-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .console-clear-btn:hover { color: white; }
+
+        #console-output {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            font-family: Consolas, monospace;
+            font-size: 12px;
+            color: var(--text-main);
+        }
+        .log-line { 
+            padding: 3px 0; 
+            border-bottom: 1px solid #1c1c1c; 
+            word-wrap: break-word; 
+            white-space: pre-wrap; 
+            display: flex; 
+            gap: 6px; 
+        }
+        .log-error { color: var(--error-color); background: rgba(244, 135, 113, 0.05); }
+        .log-warn { color: var(--warn-color); background: rgba(204, 167, 0, 0.05); }
+        .log-system { color: #888; font-style: italic; }
+        .log-shell-cmd { color: var(--shell-color); font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <div class="ide-container">
-        <div class="activity-bar">
-            <div class="activity-icon active" onclick="document.querySelector('.sidebar').classList.toggle('mobile-open')">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-            </div>
-            <div class="activity-icon" onclick="exportFiles()">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-            </div>
-        </div>
-
-        <div class="sidebar">
-            <div class="sidebar-header">EXPLORER 
-                <span style="cursor:pointer;" onclick="clearConsole()">🧹</span>
-            </div>
-            <div class="explorer-tree" id="explorer"></div>
-            <div class="sidebar-actions">
-                <button onclick="promptNewFile()">+ File</button>
-                <button onclick="resetWorkspace()">Reset</button>
-            </div>
-        </div>
-
-        <div class="main-content">
-            <div class="tabs-header" id="tabs-container"></div>
-            <div class="toolbar">
-                <button class="run-btn" onclick="runCode()">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Run Scripts
-                </button>
-            </div>
-            <div class="workspace">
-                <div id="editor-container">
-                    <div class="editor-placeholder" id="placeholder-layer"></div>
-                </div>
-                
-                <div class="output-panel">
-                    <div class="output-header">
-                        <div class="output-tab active" id="tab-nav-terminal" onclick="switchOutputTab('terminal')">Terminal Output</div>
-                        <div class="output-tab" id="tab-nav-preview" onclick="switchOutputTab('preview')">Live Preview</div>
-                    </div>
-                    
-                    <div class="output-content active" id="output-content-terminal">
-                        <div id="console-output"></div>
-                    </div>
-                    
-                    <div class="output-content" id="output-content-preview" style="height:100%;">
-                        <iframe id="live-preview-frame" sandbox="allow-scripts"></iframe>
-                    </div>
-                </div>
-            </div>
+    <div class="header">
+        <div class="tabs-container" id="tabs-container"></div>
+        <button class="add-tab-btn" onclick="promptNewTab()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <div class="actions">
+            <button onclick="runCode()">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Run
+            </button>
+            <button onclick="exportFiles()">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Export
+            </button>
         </div>
     </div>
 
-    <div class="status-bar">
-        <div style="display: flex;">
-            <div class="status-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg> 0</div>
-            <div class="status-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> 0</div>
-        </div>
-        <div style="display: flex;">
-            <div class="status-item" id="status-lang">READY</div>
-            <div class="status-item">UTF-8</div>
-            <div class="status-item">LF</div>
+    <div class="utility-bar">
+        <label>
+            <input type="checkbox" id="wrap-toggle" onchange="toggleWordWrap(this.checked)"> Word Wrap
+        </label>
+        <label>
+            Size:
+            <select id="font-size-select" onchange="changeFontSize(this.value)">
+                <option value="12px">12px</option>
+                <option value="14px" selected>14px</option>
+                <option value="16px">16px</option>
+                <option value="18px">18px</option>
+            </select>
+        </label>
+        <span id="save-status" style="margin-left: auto; font-style: italic; opacity: 0.7;">Ready</span>
+    </div>
+
+    <div class="workspace">
+        <div id="editor"></div>
+        <div class="output-panel">
+            <iframe id="preview"></iframe>
+            <div class="console-container">
+                <div class="console-header">
+                    <span>Live Output Log</span>
+                    <div class="console-clear-btn" onclick="clearConsole()">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        Clear
+                    </div>
+                </div>
+                <div id="console-output"></div>
+            </div>
         </div>
     </div>
 
     <script>
-        /* ================= Virtual Storage Layer ================= */
-        const memStorage = {};
-        const safeStorage = {
-            get: function(key) { try { return localStorage.getItem(key) || memStorage[key] || null; } catch(e) { return memStorage[key] || null; } },
-            set: function(key, val) { try { localStorage.setItem(key, val); } catch(e) { memStorage[key] = val; } },
-            remove: function(key) { try { localStorage.removeItem(key); } catch(e) { delete memStorage[key]; } }
+        // Safe Storage Wrappers
+        function safeGetItem(key) {
+            try { return localStorage.getItem(key); } 
+            catch(e) { return null; }
+        }
+        function safeSetItem(key, val) {
+            try { localStorage.setItem(key, val); } 
+            catch(e) { /* Ignore - running in memory mode */ }
+        }
+
+        // Default Local File Template Architecture (Updated with Shebang)
+        const defaultFiles = [
+            { id: 'f1', name: 'index.html', type: 'html', content: '<h1>Hello World</h1>\n<p>Open the console below!</p>' },
+            { id: 'f2', name: 'style.css', type: 'css', content: 'body {\n  font-family: sans-serif;\n  color: #333;\n  text-align: center;\n}\nh1 { color: #007acc; }' },
+            { id: 'f3', name: 'script.js', type: 'javascript', content: 'console.log("App loaded successfully!");' },
+            { id: 'f4', name: 'build.sh', type: 'shell', content: '#!/bin/sh\n# Welcome to the Shell Engine\necho "Starting pre-build sequence..."\nuname -a\n# curl https://jsonplaceholder.typicode.com/todos/1' }
+        ];
+
+        // Persistence State Initialization
+        let parsedFiles = null;
+        let storedData = safeGetItem('ide_files');
+        if (storedData) {
+            try { parsedFiles = JSON.parse(storedData); } catch (e) {}
+        }
+
+        let files = parsedFiles || defaultFiles;
+        let activeFileId = safeGetItem('ide_active_file') || 'f1';
+        let editorInstance = null;
+        let isAceActive = false;
+
+        // Vector Asset Compiler Map
+        const icons = {
+            html: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e34c26" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>',
+            css: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#264de4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>',
+            js: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f0db4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M8 13h4M8 17h4"></path></svg>',
+            sh: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4caf50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>',
+            generic: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#969696" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>',
+            close: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>'
         };
 
-        /* ================= Empty Workspace Initialization ================= */
-        let files = [];
-        try { files = JSON.parse(safeStorage.get('ide_vfs')) || []; } catch (e) { files = []; }
-        
-        let openTabs = [];
-        try { openTabs = JSON.parse(safeStorage.get('ide_tabs')) || []; } catch (e) { openTabs = []; }
-
-        let activeFileId = safeStorage.get('ide_active') || null;
-        let editor;
-
-        function saveState() {
-            safeStorage.set('ide_vfs', JSON.stringify(files));
-            safeStorage.set('ide_tabs', JSON.stringify(openTabs));
-            safeStorage.set('ide_active', activeFileId);
+        function getFileIcon(name) {
+            if (name.endsWith('.html')) return icons.html;
+            if (name.endsWith('.css')) return icons.css;
+            if (name.endsWith('.js')) return icons.js;
+            if (name.endsWith('.sh')) return icons.sh;
+            return icons.generic;
         }
 
-        /* ================= VFS Methods ================= */
-        function createVFSFile(name, content = "") {
-            let existing = files.find(f => f.name === name);
-            if (existing) {
-                openFile(existing.id);
-                return;
-            }
-            
-            let type = 'text';
-            if(name.endsWith('.py')) type = 'python';
-            else if(name.endsWith('.sh')) type = 'shell';
-            else if(name.endsWith('.html')) type = 'html';
-            else if(name.endsWith('.css')) type = 'css';
-            else if(name.endsWith('.js')) type = 'javascript';
-            
-            let newFile = { id: 'f' + Date.now(), name: name, type: type, content: content };
-            files.push(newFile);
-            openTabs.push(newFile.id);
-            activeFileId = newFile.id;
-            
-            saveState();
-            renderUI();
-        }
-
-        /* ================= Core Code Editor Build ================= */
+        // Initialize Ace System or Core Fallback Engine
         try {
-            editor = ace.edit("editor-container");
-            editor.setTheme("ace/theme/tomorrow_night_eighties");
-            editor.setOptions({ fontSize: "14px", showPrintMargin: false, enableBasicAutocompletion: true });
-            
-            editor.on("change", () => {
-                if(!activeFileId) return;
-                let f = files.find(f => f.id === activeFileId);
-                if (f) { f.content = editor.getValue(); saveState(); }
-            });
-        } catch (e) { console.error("Editor loading failure", e); }
-
-        function resetWorkspace() {
-            if(confirm("Wipe workspace and start fresh?")) {
-                safeStorage.remove('ide_vfs');
-                safeStorage.remove('ide_tabs');
-                safeStorage.remove('ide_active');
-                location.reload();
+            if (typeof ace !== 'undefined') {
+                editorInstance = ace.edit("editor");
+                editorInstance.setTheme("ace/theme/tomorrow_night_eighties");
+                editorInstance.setOptions({
+                    fontSize: "14px",
+                    showPrintMargin: false,
+                    enableBasicAutocompletion: true,
+                    enableLiveAutocompletion: true
+                });
+                isAceActive = true;
+                systemLog("System Core: Advanced Editor loaded.");
+            } else {
+                throw new Error("Ace library blocked or offline");
             }
+        } catch (e) {
+            document.getElementById('editor').innerHTML = '<textarea id="fallback-textarea" spellcheck="false"></textarea>';
+            editorInstance = {
+                getValue: function() { return document.getElementById('fallback-textarea').value; },
+                setValue: function(val) { document.getElementById('fallback-textarea').value = val; },
+                session: { setMode: function(mode) {}, setUseWrapMode: function(b) {} }
+            };
+            systemLog("Environment Isolation: Script execution blocked. Fallback operational.");
+        }
+
+        // Core Synchronization Registry
+        function syncState() {
+            const activeFile = files.find(f => f.id === activeFileId);
+            if (activeFile && editorInstance) activeFile.content = editorInstance.getValue();
+            
+            safeSetItem('ide_files', JSON.stringify(files));
+            safeSetItem('ide_active_file', activeFileId);
+            
+            const status = document.getElementById('save-status');
+            if (status) {
+                status.innerText = "Saved";
+                setTimeout(() => { status.innerText = "Synced"; }, 1000);
+            }
+        }
+
+        function toggleWordWrap(enabled) {
+            if (isAceActive) {
+                editorInstance.session.setUseWrapMode(enabled);
+            } else {
+                const el = document.getElementById('fallback-textarea');
+                if (el) el.style.whiteSpace = enabled ? 'pre-wrap' : 'pre';
+            }
+        }
+
+        function changeFontSize(size) {
+            if (isAceActive) {
+                editorInstance.setFontSize(size);
+            } else {
+                const el = document.getElementById('fallback-textarea');
+                if (el) el.style.fontSize = size;
+            }
+        }
+
+        // Tab Management Engine
+        function renderTabs() {
+            const container = document.getElementById('tabs-container');
+            container.innerHTML = '';
+            
+            files.forEach((file) => {
+                const tab = document.createElement('div');
+                tab.className = 'tab' + (file.id === activeFileId ? ' active' : '');
+                tab.dataset.id = file.id;
+                
+                const iconWrapper = document.createElement('span');
+                iconWrapper.style.display = 'flex';
+                iconWrapper.innerHTML = getFileIcon(file.name);
+
+                const nameSpan = document.createElement('span');
+                nameSpan.innerText = file.name;
+                nameSpan.onclick = () => switchTab(file.id);
+                
+                const closeBtn = document.createElement('div');
+                closeBtn.className = 'close-tab';
+                closeBtn.innerHTML = icons.close;
+                closeBtn.onclick = (e) => { e.stopPropagation(); closeTab(file.id); };
+
+                tab.appendChild(iconWrapper);
+                tab.appendChild(nameSpan);
+                tab.appendChild(closeBtn);
+                setupDraggableTab(tab, file.id);
+                container.appendChild(tab);
+            });
+        }
+
+        function switchTab(id) {
+            syncState();
+            activeFileId = id;
+            const newFile = files.find(f => f.id === id);
+            
+            if (isAceActive) {
+                let mode = 'text';
+                if (newFile.type === 'html' || newFile.name.endsWith('.html')) mode = 'html';
+                else if (newFile.type === 'css' || newFile.name.endsWith('.css')) mode = 'css';
+                else if (newFile.type === 'javascript' || newFile.name.endsWith('.js')) mode = 'javascript';
+                else if (newFile.type === 'shell' || newFile.name.endsWith('.sh')) mode = 'sh';
+                
+                editorInstance.session.setMode("ace/mode/" + mode);
+                editorInstance.setValue(newFile.content, -1);
+            } else {
+                editorInstance.setValue(newFile.content);
+            }
+            renderTabs();
+            safeSetItem('ide_active_file', activeFileId);
+        }
+
+        function promptNewTab() {
+            const name = prompt("Enter complete filename (e.g. build.sh):", "script.js");
+            if (!name) return;
+            const newId = 'f' + Date.now();
+            let type = 'text';
+            if (name.endsWith('.html')) type = 'html';
+            else if (name.endsWith('.css')) type = 'css';
+            else if (name.endsWith('.js')) type = 'javascript';
+            else if (name.endsWith('.sh')) type = 'shell';
+            
+            files.push({ id: newId, name: name, type: type, content: '' });
+            switchTab(newId);
+        }
+
+        function closeTab(id) {
+            if (files.length <= 1) return alert("System core restriction: Active workspace requires 1 minimum tab.");
+            files = files.filter(f => f.id !== id);
+            if (activeFileId === id) switchTab(files[0].id);
+            else renderTabs();
+            syncState();
+        }
+
+        function setupDraggableTab(tabElement, fileId) {
+            const handleStart = (e) => {
+                if(e.target.closest('.close-tab')) return;
+                tabElement.classList.add('dragging');
+            };
+            const handleMove = (e) => {
+                if(!tabElement.classList.contains('dragging')) return;
+                e.preventDefault(); 
+                const clientX = e.type.includes('mouse') ? e.pageX : e.touches[0].pageX;
+                const container = document.getElementById('tabs-container');
+                const tabs = Array.from(container.querySelectorAll('.tab:not(.dragging)'));
+                
+                let nextElement = null;
+                for(let sibling of tabs) {
+                    const rect = sibling.getBoundingClientRect();
+                    if(clientX < rect.left + rect.width / 2) {
+                        nextElement = sibling;
+                        break;
+                    }
+                }
+                if (nextElement) container.insertBefore(tabElement, nextElement);
+                else container.appendChild(tabElement);
+            };
+            const handleEnd = (e) => {
+                if(!tabElement.classList.contains('dragging')) return;
+                tabElement.classList.remove('dragging');
+                const newDOMOrder = Array.from(document.getElementById('tabs-container').children);
+                files.sort((a, b) => {
+                    return newDOMOrder.findIndex(el => el.dataset.id === a.id) - 
+                           newDOMOrder.findIndex(el => el.dataset.id === b.id);
+                });
+                syncState();
+            };
+
+            tabElement.addEventListener('mousedown', handleStart);
+            document.addEventListener('mousemove', handleMove, { passive: false });
+            document.addEventListener('mouseup', handleEnd);
+            tabElement.addEventListener('touchstart', handleStart, { passive: true });
+            document.addEventListener('touchmove', handleMove, { passive: false });
+            document.addEventListener('touchend', handleEnd);
+        }
+
+        /*================================================================
+           CUSTOM SHELL INTERPRETER ENGINE (.sh parser)
+        ================================================================*/
+        async function executeShellScript(scriptContent) {
+            const lines = scriptContent.split('\n');
+            let isFirstLine = true;
+
+            for (let line of lines) {
+                line = line.trim();
+
+                // Shebang Parser
+                if (isFirstLine && line.startsWith('#!')) {
+                    systemLog(`Interpreter initialized -> Executing via ${line.substring(2)}`);
+                    isFirstLine = false;
+                    continue; 
+                }
+                isFirstLine = false;
+
+                if (!line || line.startsWith('#')) continue;
+
+                const out = document.getElementById('console-output');
+                if(out) {
+                    out.innerHTML += '<div class="log-line log-shell-cmd">~ # ' + escapeHTML(line) + '</div>';
+                    out.scrollTop = out.scrollHeight;
+                }
+
+                const parts = line.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
+                if (parts.length === 0) continue;
+                
+                const cmd = parts[0].toLowerCase();
+                const args = parts.slice(1).map(arg => arg.replace(/^["']|["']$/g, ''));
+
+                try {
+                    switch(cmd) {
+                        case 'echo':
+                            simLog('log', args.join(' '));
+                            break;
+                        case 'ls':
+                        case 'dir':
+                            const fileNames = files.map(f => f.name).join('  ');
+                            simLog('log', fileNames);
+                            break;
+                        case 'whoami':
+                            simLog('log', 'developer');
+                            break;
+                        case 'date':
+                            simLog('log', new Date().toString());
+                            break;
+                        case 'clear':
+                            clearConsole();
+                            break;
+                        case 'help':
+                            simLog('log', 'Supported IDE shell commands: echo, ls, dir, help, whoami, clear, date, curl, uname');
+                            break;
+                        case 'uname':
+                            const unameHelpText = `BusyBox v1.24.1 (2025-03-20 21:34:25 KST) multi-call binary.
+
+Usage: uname [-amnrspvio]
+
+Print system information
+
+        -a      Print all
+        -m      The machine (hardware) type
+        -n      Hostname
+        -r      Kernel release
+        -s      Kernel name (default)
+        -p      Processor type
+        -v      Kernel version
+        -i      The hardware platform
+        -o      OS name
+     --help  Print the help page`;
+
+                            const unameHelpInvalid = `BusyBox v1.24.1 (2025-03-20 21:34:25 KST) multi-call binary.
+
+Usage: uname [-amnrspvio]
+
+Print system information
+
+        -a      Print all
+        -m      The machine (hardware) type
+        -n      Hostname
+        -r      Kernel release
+        -s      Kernel name (default)
+        -p      Processor type
+        -v      Kernel version
+        -i      The hardware platform
+        -o      OS name
+   --help    Prints the help page.`;
+
+                            // Re-engineered for Ubuntu Mock Output
+                            const sysInfo = {
+                                s: 'Linux',
+                                n: 'ubuntu',
+                                r: '5.15.0-101-generic',
+                                v: '#111-Ubuntu SMP PREEMPT Thu Mar 20 21:32:21 KST 2025',
+                                m: 'x86_64',
+                                p: 'x86_64',
+                                i: 'x86_64',
+                                o: 'GNU/Linux'
+                            };
+
+                            if (args.length === 0) {
+                                simLog('log', sysInfo.s);
+                                break;
+                            }
+
+                            if (args[0] === '--help') {
+                                simLog('log', unameHelpText);
+                                break;
+                            }
+
+                            let flags = args[0];
+                            if (flags.startsWith('-')) {
+                                flags = flags.substring(1);
+                                let output = [];
+                                let invalidFlag = null;
+
+                                for (let char of flags) {
+                                    if (!['a', 'm', 'n', 'r', 's', 'p', 'v', 'i', 'o'].includes(char)) {
+                                        invalidFlag = char;
+                                        break;
+                                    }
+                                }
+
+                                if (invalidFlag) {
+                                    simLog('log', `uname: invalid option -- '${invalidFlag}'\n${unameHelpInvalid}`);
+                                    break;
+                                }
+                                
+                                if (flags.includes('a')) {
+                                    simLog('log', `${sysInfo.s} ${sysInfo.n} ${sysInfo.r} ${sysInfo.v} ${sysInfo.m} ${sysInfo.o}`);
+                                    break;
+                                }
+
+                                const order = ['s', 'n', 'r', 'v', 'm', 'p', 'i', 'o'];
+                                for(let f of order) {
+                                    if(flags.includes(f)) output.push(sysInfo[f]);
+                                }
+                                
+                                if (output.length > 0) {
+                                    simLog('log', output.join(' '));
+                                } else {
+                                    simLog('log', sysInfo.s);
+                                }
+                            } else {
+                                simLog('error', `uname: extra operand '${args[0]}'\nTry 'uname --help' for more information.`);
+                            }
+                            break;
+                        case 'curl':
+                            if (args.length > 0) {
+                                simLog('log', `Fetching ${args[0]}...`);
+                                const res = await fetch(args[0]);
+                                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                                const text = await res.text();
+                                simLog('log', text.substring(0, 200) + (text.length > 200 ? '\n...[truncated]' : ''));
+                            } else {
+                                simLog('error', 'curl: no URL specified');
+                            }
+                            break;
+                        default:
+                            simLog('error', `bash: ${cmd}: command not found`);
+                    }
+                } catch (err) {
+                    simLog('error', `${cmd}: failed - ${err.message}`);
+                }
+            }
+        }
+
+        function simLog(type, msg) {
+            const out = document.getElementById('console-output');
+            const logLine = document.createElement('div');
+            logLine.className = 'log-line log-' + type;
+            logLine.innerHTML = '<span>&gt;&nbsp;</span>' + '<span>' + escapeHTML(msg) + '</span>';
+            out.appendChild(logLine);
+            out.scrollTop = out.scrollHeight;
+        }
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag])
+            );
+        }
+
+        const consoleHijackScript = "<script>\n" +
+            "(function() {\n" +
+            "    const send = (type, args) => {\n" +
+            "        const parsedArgs = Array.from(args).map(arg => {\n" +
+            "            if(typeof arg === 'object') return JSON.stringify(arg);\n" +
+            "            return String(arg);\n" +
+            "        });\n" +
+            "        window.parent.postMessage({ source: 'live-preview', type: type, args: parsedArgs }, '*');\n" +
+            "    };\n" +
+            "    const ogLog = console.log, ogWarn = console.warn, ogErr = console.error;\n" +
+            "    console.log = function() { send('log', arguments); ogLog.apply(console, arguments); };\n" +
+            "    console.warn = function() { send('warn', arguments); ogWarn.apply(console, arguments); };\n" +
+            "    console.error = function() { send('error', arguments); ogErr.apply(console, arguments); };\n" +
+            "    window.onerror = function(msg, url, line) {\n" +
+            "        send('error', [msg + ' (Line ' + line + ')']);\n" +
+            "        return false;\n" +
+            "    };\n" +
+            "})();\n" +
+            "</scr" + "ipt>";
+
+        window.addEventListener('message', (event) => {
+            if(event.data && event.data.source === 'live-preview') {
+                const out = document.getElementById('console-output');
+                const logLine = document.createElement('div');
+                logLine.className = 'log-line log-' + event.data.type;
+                logLine.innerHTML = '<span>&gt;&nbsp;</span><span>' + escapeHTML(event.data.args.join(' ')) + '</span>';
+                out.appendChild(logLine);
+                out.scrollTop = out.scrollHeight;
+            }
+        });
+
+        function clearConsole() {
+            document.getElementById('console-output').innerHTML = '';
+        }
+
+        function systemLog(msg) {
+            const out = document.getElementById('console-output');
+            if(out) {
+                out.innerHTML += '<div class="log-line log-system">' + msg + '</div>';
+                out.scrollTop = out.scrollHeight;
+            }
+        }
+
+        async function runCode() {
+            syncState();
+            clearConsole();
+            systemLog('System: Initiating build sequence...');
+
+            const shellFiles = files.filter(f => f.type === 'shell' || f.name.endsWith('.sh'));
+            for (let shFile of shellFiles) {
+                await executeShellScript(shFile.content);
+            }
+
+            let htmlBase = '';
+            let cssBlock = '';
+            let jsBlock = '';
+
+            files.forEach(f => {
+                if(f.type === 'html' || f.name.endsWith('.html')) htmlBase += f.content + '\n';
+                if(f.type === 'css' || f.name.endsWith('.css')) cssBlock += f.content + '\n';
+                if(f.type === 'javascript' || f.name.endsWith('.js')) jsBlock += f.content + '\n';
+            });
+
+            const finalDocument = htmlBase + "\n" +
+                "<style>\n" + cssBlock + "\n</style>\n" +
+                consoleHijackScript + "\n" +
+                "<script>\n" + jsBlock + "\n</scr" + "ipt>";
+
+            document.getElementById('preview').srcdoc = finalDocument;
         }
 
         function exportFiles() {
-            saveState();
-            if(files.length === 0) return alert("No source maps to save.");
+            syncState();
             files.forEach(f => {
-                let mime = f.type === 'html' ? 'text/html' : f.type === 'css' ? 'text/css' : f.type === 'javascript' ? 'text/javascript' : 'text/plain';
+                if (!f.content.trim()) return;
+                let mime = 'text/plain';
+                if (f.type === 'html') mime = 'text/html';
+                if (f.type === 'css') mime = 'text/css';
+                if (f.type === 'javascript') mime = 'text/javascript';
+                if (f.type === 'shell') mime = 'application/x-sh';
+
                 const blob = new Blob([f.content], { type: mime });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -379,199 +819,28 @@
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             });
+            systemLog('System Workspace Dump: All assets downloaded.');
         }
 
-        /* ================= Custom Colored SVG Library ================= */
-        const icons = {
-            py: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3776ab" stroke-width="2"><path d="M12 22a7 7 0 0 0 7-7h-3a4 4 0 0 1-4 4H5a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3h3V3a3 3 0 0 1 3-3h5a3 3 0 0 1 3 3v3h1a4 4 0 0 1 4 4v5a7 7 0 0 1-7 7z"/></svg>',
-            sh: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4caf50" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>',
-            html: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e34f26" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>',
-            css: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1572b6" stroke-width="2"><path d="M10 12l2-9 8 2-2 9-8-2zm-6 2l12 3-1 4-12-3 1-4z"></path></svg>',
-            js: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f7df1e" stroke-width="2"><path d="M2 2h20v20H2z"></path><path d="M11 16c-1.5 1.5-3 1.5-4 0M17 16c-1.5 1.5-3 1.5-4 0M11 10v6M17 10v6"></path></svg>',
-            txt: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#969696" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>'
-        };
-
-        function getIcon(name) {
-            if (name.endsWith('.py')) return icons.py;
-            if (name.endsWith('.sh')) return icons.sh;
-            if (name.endsWith('.html') || name.endsWith('.htm')) return icons.html;
-            if (name.endsWith('.css')) return icons.css;
-            if (name.endsWith('.js')) return icons.js;
-            return icons.txt;
-        }
-
-        /* ================= Interface Navigation Handles ================= */
-        function switchOutputTab(tabType) {
-            document.querySelectorAll('.output-tab').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.output-content').forEach(el => el.classList.remove('active'));
-            
-            document.getElementById(`tab-nav-${tabType}`).classList.add('active');
-            document.getElementById(`output-content-${tabType}`).classList.add('active');
-            
-            if(tabType === 'preview') compileLiveSandbox();
-        }
-
-        /* ================= Sandboxed Document Engine ================= */
-        function compileLiveSandbox() {
-            const htmlFile = files.find(f => f.name.endsWith('.html'))?.content || '';
-            const cssFile = files.find(f => f.name.endsWith('.css'))?.content || '';
-            const jsFile = files.find(f => f.name.endsWith('.js'))?.content || '';
-
-            const iframe = document.getElementById('live-preview-frame');
-            if(!iframe) return;
-
-            iframe.srcdoc = `
-                <!DOCTYPE html>
-                <html lang="en">
-                <head>
-                    <meta charset="UTF-8">
-                    <style>${cssFile}</style>
-                </head>
-                <body>
-                    ${htmlFile}
-                    <script>
-                        window.onerror = function(message, source, lineno, colno, error) {
-                            window.parent.postMessage({type: 'iframe-error', msg: message, line: lineno}, '*');
-                            return false;
-                        };
-                        ${jsFile}
-                    <\/script>
-                </body>
-                </html>
-            `;
-        }
-
-        window.addEventListener('message', (e) => {
-            if (e.data && e.data.type === 'iframe-error') {
-                simLog('error', `Sandbox Runtime Exception (Line ${e.data.line}): ${e.data.msg}`);
-            }
-        });
-
-        /* ================= Layout & Window Node Renders ================= */
-        let draggedTabId = null;
-
-        function renderUI() {
-            // Explorer tree node sync
-            const exp = document.getElementById('explorer');
-            exp.innerHTML = '';
-            files.forEach(f => {
-                let div = document.createElement('div');
-                div.className = 'file-item' + (f.id === activeFileId ? ' active' : '');
-                div.innerHTML = getIcon(f.name) + '<span>' + f.name + '</span>';
-                div.onclick = () => openFile(f.id);
-                exp.appendChild(div);
+        if (isAceActive) {
+            editorInstance.on("change", () => {
+                const activeFile = files.find(f => f.id === activeFileId);
+                if (activeFile) activeFile.content = editorInstance.getValue();
+                safeSetItem('ide_files', JSON.stringify(files));
             });
-
-            // Tabs layout context sync
-            const tabsContainer = document.getElementById('tabs-container');
-            tabsContainer.innerHTML = '';
-            
-            openTabs.forEach((tid, index) => {
-                let f = files.find(file => file.id === tid);
-                if(!f) return;
-
-                let t = document.createElement('div');
-                t.className = 'tab' + (f.id === activeFileId ? ' active' : '');
-                t.innerHTML = getIcon(f.name) + `<span>${f.name}</span>`;
-                
-                let closeBtn = document.createElement('div');
-                closeBtn.className = 'tab-close';
-                closeBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-                closeBtn.onclick = (e) => closeTab(e, f.id);
-                t.appendChild(closeBtn);
-
-                // Desktop Drag Triggers
-                t.draggable = true;
-                t.ondragstart = (e) => { draggedTabId = f.id; e.dataTransfer.effectAllowed = "move"; };
-                t.ondragover = (e) => { e.preventDefault(); t.classList.add('drag-over'); };
-                t.ondragleave = () => t.classList.remove('drag-over');
-                t.ondrop = (e) => {
-                    e.preventDefault();
-                    t.classList.remove('drag-over');
-                    if (draggedTabId && draggedTabId !== f.id) { moveTab(draggedTabId, index); }
-                };
-
-                // Mobile Touch Swiping Tab Arranger
-                let touchStartX = 0;
-                t.ontouchstart = (e) => { touchStartX = e.touches[0].clientX; };
-                t.ontouchend = (e) => {
-                    let diff = e.changedTouches[0].clientX - touchStartX;
-                    if (Math.abs(diff) > 40) {
-                        if (diff > 0 && index < openTabs.length - 1) moveTab(f.id, index + 1);
-                        else if (diff < 0 && index > 0) moveTab(f.id, index - 1);
-                    } else if (Math.abs(diff) < 10) {
-                        openFile(f.id);
-                    }
-                };
-                
-                t.onmousedown = () => { openFile(f.id) };
-                tabsContainer.appendChild(t);
-            });
-
-            // Handle workspace visibility states safely
-            let active = files.find(f => f.id === activeFileId);
-            const placeholder = document.getElementById('placeholder-layer');
-            
-            if(active && openTabs.includes(activeFileId)) {
-                placeholder.style.display = 'none';
-                document.getElementById('status-lang').innerText = active.type.toUpperCase();
-                if(editor) {
-                    let mode = active.type === 'javascript' ? 'javascript' : active.type;
-                    editor.session.setMode("ace/mode/" + mode);
-                    if(editor.getValue() !== active.content) editor.setValue(active.content, -1);
-                }
-            } else {
-                placeholder.style.display = 'flex';
-                document.getElementById('status-lang').innerText = "READY";
+        } else {
+            const el = document.getElementById('fallback-textarea');
+            if (el) {
+                el.addEventListener('input', () => {
+                    const activeFile = files.find(f => f.id === activeFileId);
+                    if (activeFile) activeFile.content = el.value;
+                    safeSetItem('ide_files', JSON.stringify(files));
+                });
             }
         }
 
-        function openFile(id) {
-            if (!openTabs.includes(id)) openTabs.push(id);
-            activeFileId = id;
-            saveState();
-            renderUI();
-        }
-
-        function closeTab(e, id) {
-            e.stopPropagation();
-            openTabs = openTabs.filter(tid => tid !== id);
-            if (activeFileId === id) activeFileId = openTabs.length > 0 ? openTabs[openTabs.length - 1] : null;
-            saveState();
-            renderUI();
-        }
-
-        function moveTab(draggedId, targetIndex) {
-            let currentIndex = openTabs.indexOf(draggedId);
-            openTabs.splice(currentIndex, 1);
-            openTabs.splice(targetIndex, 0, draggedId);
-            saveState();
-            renderUI();
-        }
-
-        function promptNewFile() {
-            let n = prompt("Enter filename (e.g. index.html, main.py, styles.css):");
-            if(n) createVFSFile(n, "");
-        }
-
-        function clearConsole() { document.getElementById('console-output').innerHTML = ''; }
-        function simLog(type, msg) {
-            const out = document.getElementById('console-output');
-            out.innerHTML += `<div class="log-line log-${type}"><span>&gt;&nbsp;</span><span>${msg}</span></div>`;
-            out.scrollTop = out.scrollHeight;
-        }
-
-        async function runCode() {
-            clearConsole();
-            simLog('system', 'Building runtime environment compilation trees...');
-            compileLiveSandbox();
-            simLog('shell', 'Live preview updated container contexts.');
-            
-            let active = files.find(f => f.id === activeFileId);
-            if(active) simLog('log', `Active process thread linked: ${active.name}`);
-        }
-
-        renderUI();
+        switchTab(activeFileId);
+        runCode();
     </script>
 </body>
 </html>
