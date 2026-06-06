@@ -592,12 +592,6 @@
             document.addEventListener('mouseup', handleEnd);
         }
 
-        function escapeHTML(str) {
-            return str.replace(/[&<>'"]/g, 
-                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag])
-            );
-        }
-
         const consoleHijackScript = "<script>\n" +
             "(function() {\n" +
             "    const send = (type, args) => {\n" +
@@ -623,7 +617,13 @@
                 const out = document.getElementById('console-output');
                 const logLine = document.createElement('div');
                 logLine.className = 'log-line log-' + event.data.type;
-                logLine.innerHTML = '<span>&gt;&nbsp;</span><span>' + escapeHTML(event.data.args.join(' ')) + '</span>';
+                
+                // Keep html escaping here for displaying the logs safely in the console UI
+                const safeText = String(event.data.args.join(' ')).replace(/[&<>'"]/g, 
+                    tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag])
+                );
+                
+                logLine.innerHTML = '<span>&gt;&nbsp;</span><span>' + safeText + '</span>';
                 out.appendChild(logLine);
                 out.scrollTop = out.scrollHeight;
             }
@@ -650,13 +650,14 @@
             let cssBlock = '';
             let jsBlock = '';
             
-            // For QmlWeb integration, we inject the primary QML file as a script block.
             let mainQmlFile = files.find(f => f.name === 'main.qml') || files.find(f => f.type === 'qml' || f.name.endsWith('.qml'));
             let qmlBlock = '';
 
             if (mainQmlFile) {
                 systemLog(`QML Engine: Targeting ${mainQmlFile.name} for rendering context.`);
-                qmlBlock = `<script type="text/qml" id="qml-source-code">${escapeHTML(mainQmlFile.content)}<\/script>`;
+                // FIX: Do not escape HTML inside <script> tags. It breaks QML operators. Just escape closing script tags.
+                const safeQml = mainQmlFile.content.replace(/<\/script>/gi, "<\\/script>");
+                qmlBlock = `<script type="text/qml" id="qml-source-code">${safeQml}<\/script>`;
             }
 
             files.forEach(f => {
@@ -670,7 +671,7 @@
 <html>
 <head>
     <style>${cssBlock}</style>
-    <script type="text/javascript" src="qmlweb.js"><\/script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/qmlweb/lib/qmlweb.js"><\/script>
     ${consoleHijackScript}
 </head>
 <body style="margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: transparent;">
@@ -695,7 +696,7 @@
                     console.error("QML Runtime Exception: " + e.message);
                 }
             } else if (qmlScript) {
-                console.error("Critical: QmlWeb library not loaded. Check path to /lib/qmlweb.js");
+                console.error("Critical: QmlWeb library not loaded. Check CDN connection.");
             }
         });
     <\/script>
