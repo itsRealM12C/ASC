@@ -20,7 +20,20 @@
             --console-bg: #111111;
             --error-color: #f48771;
             --warn-color: #cca700;
-            --shell-color: #4caf50;
+            --qml-color: #41cd52;
+            --border-line: #1c1c1c;
+        }
+
+        body.light-mode {
+            --bg-main: #ffffff;
+            --bg-tabs: #f3f3f3;
+            --bg-tab-inactive: #ececec;
+            --bg-tab-hover: #e0e0e0;
+            --border-color: #cccccc;
+            --text-main: #333333;
+            --text-muted: #666666;
+            --console-bg: #f9f9f9;
+            --border-line: #eaeaea;
         }
 
         * {
@@ -38,6 +51,7 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            transition: background-color 0.2s, color 0.2s;
         }
 
         /* Header & Tabs */
@@ -80,7 +94,7 @@
         .tab:hover { background-color: var(--bg-tab-hover); }
         .tab.active {
             background-color: var(--bg-main);
-            color: white;
+            color: var(--text-main);
             border-top: 2px solid var(--accent);
         }
         .tab.dragging {
@@ -99,7 +113,7 @@
             transition: background-color 0.2s, color 0.2s;
         }
         .close-tab:hover {
-            background-color: rgba(255, 255, 255, 0.1);
+            background-color: rgba(128, 128, 128, 0.2);
             color: #ff5f56;
         }
 
@@ -115,7 +129,7 @@
             justify-content: center;
             transition: color 0.2s;
         }
-        .add-tab-btn:hover { color: white; }
+        .add-tab-btn:hover { color: var(--accent); }
 
         .actions { 
             display: flex; 
@@ -211,6 +225,7 @@
             border-top: 2px solid var(--accent);
             height: 50vh;
             width: 100%;
+            background-color: #fff;
         }
         @media (min-width: 768px) {
             .output-panel { height: 100%; width: 50%; border-top: none; border-left: 2px solid var(--accent); }
@@ -219,7 +234,7 @@
         #preview {
             flex: 2;
             width: 100%;
-            background: #fff;
+            background: transparent;
             border: none;
         }
 
@@ -247,7 +262,7 @@
             cursor: pointer;
             transition: color 0.2s;
         }
-        .console-clear-btn:hover { color: white; }
+        .console-clear-btn:hover { color: var(--accent); }
 
         #console-output {
             flex: 1;
@@ -259,7 +274,7 @@
         }
         .log-line { 
             padding: 3px 0; 
-            border-bottom: 1px solid #1c1c1c; 
+            border-bottom: 1px solid var(--border-line); 
             word-wrap: break-word; 
             white-space: pre-wrap; 
             display: flex; 
@@ -268,19 +283,18 @@
         .log-error { color: var(--error-color); background: rgba(244, 135, 113, 0.05); }
         .log-warn { color: var(--warn-color); background: rgba(204, 167, 0, 0.05); }
         .log-system { color: #888; font-style: italic; }
-        .log-shell-cmd { color: var(--shell-color); font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div class="header">
         <div class="tabs-container" id="tabs-container"></div>
-        <button class="add-tab-btn" onclick="promptNewTab()">
+        <button class="add-tab-btn" onclick="promptNewTab()" title="New File">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
         </button>
         <div class="actions">
             <button onclick="runCode()">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Run
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Build & Run
             </button>
             <button onclick="exportFiles()">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Export
@@ -290,7 +304,17 @@
 
     <div class="utility-bar">
         <label>
+            <input type="checkbox" id="live-toggle" onchange="toggleLiveMode(this.checked)"> Live Mode
+        </label>
+        <label>
             <input type="checkbox" id="wrap-toggle" onchange="toggleWordWrap(this.checked)"> Word Wrap
+        </label>
+        <label>
+            Theme:
+            <select id="theme-select" onchange="toggleTheme(this.value)">
+                <option value="dark" selected>Dark</option>
+                <option value="light">Light</option>
+            </select>
         </label>
         <label>
             Size:
@@ -332,12 +356,11 @@
             catch(e) { /* Ignore - running in memory mode */ }
         }
 
-        // Default Local File Template Architecture (Updated with Shebang)
+        // Default Local File Template Architecture (Including QML)
         const defaultFiles = [
-            { id: 'f1', name: 'index.html', type: 'html', content: '<h1>Hello World</h1>\n<p>Open the console below!</p>' },
-            { id: 'f2', name: 'style.css', type: 'css', content: 'body {\n  font-family: sans-serif;\n  color: #333;\n  text-align: center;\n}\nh1 { color: #007acc; }' },
-            { id: 'f3', name: 'script.js', type: 'javascript', content: 'console.log("App loaded successfully!");' },
-            { id: 'f4', name: 'build.sh', type: 'shell', content: '#!/bin/sh\n# Welcome to the Shell Engine\necho "Starting pre-build sequence..."\nuname -a\n# curl https://jsonplaceholder.typicode.com/todos/1' }
+            { id: 'f1', name: 'main.qml', type: 'qml', content: 'import QtQuick 2.15\n\nRectangle {\n    width: 400\n    height: 400\n    color: "#222"\n\n    Text {\n        text: "QmlWeb Environment Online"\n        color: "#41cd52"\n        anchors.centerIn: parent\n        font.pixelSize: 20\n    }\n}' },
+            { id: 'f2', name: 'index.html', type: 'html', content: '<style>\n  body { font-family: sans-serif; color: #555; }\n</style>\n\n<p style="margin: 20px;">\n  Standard DOM is still accessible beneath the QML canvas layer.\n</p>' },
+            { id: 'f3', name: 'script.js', type: 'javascript', content: 'console.log("System components initialized.");' }
         ];
 
         // Persistence State Initialization
@@ -351,13 +374,15 @@
         let activeFileId = safeGetItem('ide_active_file') || 'f1';
         let editorInstance = null;
         let isAceActive = false;
+        let isLiveMode = false;
+        let buildDebounce = null;
 
         // Vector Asset Compiler Map
         const icons = {
             html: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e34c26" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>',
             css: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#264de4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>',
             js: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f0db4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M8 13h4M8 17h4"></path></svg>',
-            sh: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4caf50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>',
+            qml: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#41cd52" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>',
             generic: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#969696" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>',
             close: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>'
         };
@@ -366,8 +391,38 @@
             if (name.endsWith('.html')) return icons.html;
             if (name.endsWith('.css')) return icons.css;
             if (name.endsWith('.js')) return icons.js;
-            if (name.endsWith('.sh')) return icons.sh;
+            if (name.endsWith('.qml')) return icons.qml;
             return icons.generic;
+        }
+
+        // Environment Config Handlers
+        function toggleTheme(mode) {
+            const isLight = mode === 'light';
+            document.body.classList.toggle('light-mode', isLight);
+            if (isAceActive) {
+                editorInstance.setTheme(isLight ? "ace/theme/chrome" : "ace/theme/tomorrow_night_eighties");
+            }
+        }
+
+        function toggleLiveMode(enabled) {
+            isLiveMode = enabled;
+            if (isLiveMode) runCode();
+        }
+
+        function toggleWordWrap(enabled) {
+            if (isAceActive) editorInstance.session.setUseWrapMode(enabled);
+            else {
+                const el = document.getElementById('fallback-textarea');
+                if (el) el.style.whiteSpace = enabled ? 'pre-wrap' : 'pre';
+            }
+        }
+
+        function changeFontSize(size) {
+            if (isAceActive) editorInstance.setFontSize(size);
+            else {
+                const el = document.getElementById('fallback-textarea');
+                if (el) el.style.fontSize = size;
+            }
         }
 
         // Initialize Ace System or Core Fallback Engine
@@ -383,49 +438,44 @@
                 });
                 isAceActive = true;
                 systemLog("System Core: Advanced Editor loaded.");
-            } else {
-                throw new Error("Ace library blocked or offline");
-            }
+            } else throw new Error("Ace library blocked or offline");
         } catch (e) {
             document.getElementById('editor').innerHTML = '<textarea id="fallback-textarea" spellcheck="false"></textarea>';
             editorInstance = {
-                getValue: function() { return document.getElementById('fallback-textarea').value; },
-                setValue: function(val) { document.getElementById('fallback-textarea').value = val; },
-                session: { setMode: function(mode) {}, setUseWrapMode: function(b) {} }
+                getValue: () => document.getElementById('fallback-textarea').value,
+                setValue: (val) => document.getElementById('fallback-textarea').value = val,
+                session: { setMode: () => {}, setUseWrapMode: () => {} }
             };
             systemLog("Environment Isolation: Script execution blocked. Fallback operational.");
+        }
+
+        function handleEditorChange() {
+            const activeFile = files.find(f => f.id === activeFileId);
+            if (activeFile && editorInstance) activeFile.content = editorInstance.getValue();
+            safeSetItem('ide_files', JSON.stringify(files));
+            
+            if (isLiveMode) {
+                clearTimeout(buildDebounce);
+                buildDebounce = setTimeout(runCode, 600);
+            }
+        }
+
+        if (isAceActive) editorInstance.on("change", handleEditorChange);
+        else {
+            const el = document.getElementById('fallback-textarea');
+            if (el) el.addEventListener('input', handleEditorChange);
         }
 
         // Core Synchronization Registry
         function syncState() {
             const activeFile = files.find(f => f.id === activeFileId);
             if (activeFile && editorInstance) activeFile.content = editorInstance.getValue();
-            
             safeSetItem('ide_files', JSON.stringify(files));
             safeSetItem('ide_active_file', activeFileId);
-            
             const status = document.getElementById('save-status');
             if (status) {
                 status.innerText = "Saved";
                 setTimeout(() => { status.innerText = "Synced"; }, 1000);
-            }
-        }
-
-        function toggleWordWrap(enabled) {
-            if (isAceActive) {
-                editorInstance.session.setUseWrapMode(enabled);
-            } else {
-                const el = document.getElementById('fallback-textarea');
-                if (el) el.style.whiteSpace = enabled ? 'pre-wrap' : 'pre';
-            }
-        }
-
-        function changeFontSize(size) {
-            if (isAceActive) {
-                editorInstance.setFontSize(size);
-            } else {
-                const el = document.getElementById('fallback-textarea');
-                if (el) el.style.fontSize = size;
             }
         }
 
@@ -470,7 +520,7 @@
                 if (newFile.type === 'html' || newFile.name.endsWith('.html')) mode = 'html';
                 else if (newFile.type === 'css' || newFile.name.endsWith('.css')) mode = 'css';
                 else if (newFile.type === 'javascript' || newFile.name.endsWith('.js')) mode = 'javascript';
-                else if (newFile.type === 'shell' || newFile.name.endsWith('.sh')) mode = 'sh';
+                else if (newFile.type === 'qml' || newFile.name.endsWith('.qml')) mode = 'qml';
                 
                 editorInstance.session.setMode("ace/mode/" + mode);
                 editorInstance.setValue(newFile.content, -1);
@@ -482,14 +532,14 @@
         }
 
         function promptNewTab() {
-            const name = prompt("Enter complete filename (e.g. build.sh):", "script.js");
+            const name = prompt("Enter complete filename (e.g. App.qml):", "Component.qml");
             if (!name) return;
             const newId = 'f' + Date.now();
             let type = 'text';
             if (name.endsWith('.html')) type = 'html';
             else if (name.endsWith('.css')) type = 'css';
             else if (name.endsWith('.js')) type = 'javascript';
-            else if (name.endsWith('.sh')) type = 'shell';
+            else if (name.endsWith('.qml')) type = 'qml';
             
             files.push({ id: newId, name: name, type: type, content: '' });
             switchTab(newId);
@@ -540,186 +590,6 @@
             tabElement.addEventListener('mousedown', handleStart);
             document.addEventListener('mousemove', handleMove, { passive: false });
             document.addEventListener('mouseup', handleEnd);
-            tabElement.addEventListener('touchstart', handleStart, { passive: true });
-            document.addEventListener('touchmove', handleMove, { passive: false });
-            document.addEventListener('touchend', handleEnd);
-        }
-
-        /*================================================================
-           CUSTOM SHELL INTERPRETER ENGINE (.sh parser)
-        ================================================================*/
-        async function executeShellScript(scriptContent) {
-            const lines = scriptContent.split('\n');
-            let isFirstLine = true;
-
-            for (let line of lines) {
-                line = line.trim();
-
-                // Shebang Parser
-                if (isFirstLine && line.startsWith('#!')) {
-                    systemLog(`Interpreter initialized -> Executing via ${line.substring(2)}`);
-                    isFirstLine = false;
-                    continue; 
-                }
-                isFirstLine = false;
-
-                if (!line || line.startsWith('#')) continue;
-
-                const out = document.getElementById('console-output');
-                if(out) {
-                    out.innerHTML += '<div class="log-line log-shell-cmd">~ # ' + escapeHTML(line) + '</div>';
-                    out.scrollTop = out.scrollHeight;
-                }
-
-                const parts = line.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
-                if (parts.length === 0) continue;
-                
-                const cmd = parts[0].toLowerCase();
-                const args = parts.slice(1).map(arg => arg.replace(/^["']|["']$/g, ''));
-
-                try {
-                    switch(cmd) {
-                        case 'echo':
-                            simLog('log', args.join(' '));
-                            break;
-                        case 'ls':
-                        case 'dir':
-                            const fileNames = files.map(f => f.name).join('  ');
-                            simLog('log', fileNames);
-                            break;
-                        case 'whoami':
-                            simLog('log', 'developer');
-                            break;
-                        case 'date':
-                            simLog('log', new Date().toString());
-                            break;
-                        case 'clear':
-                            clearConsole();
-                            break;
-                        case 'help':
-                            simLog('log', 'Supported IDE shell commands: echo, ls, dir, help, whoami, clear, date, curl, uname');
-                            break;
-                        case 'uname':
-                            const unameHelpText = `BusyBox v1.24.1 (2025-03-20 21:34:25 KST) multi-call binary.
-
-Usage: uname [-amnrspvio]
-
-Print system information
-
-        -a      Print all
-        -m      The machine (hardware) type
-        -n      Hostname
-        -r      Kernel release
-        -s      Kernel name (default)
-        -p      Processor type
-        -v      Kernel version
-        -i      The hardware platform
-        -o      OS name
-     --help  Print the help page`;
-
-                            const unameHelpInvalid = `BusyBox v1.24.1 (2025-03-20 21:34:25 KST) multi-call binary.
-
-Usage: uname [-amnrspvio]
-
-Print system information
-
-        -a      Print all
-        -m      The machine (hardware) type
-        -n      Hostname
-        -r      Kernel release
-        -s      Kernel name (default)
-        -p      Processor type
-        -v      Kernel version
-        -i      The hardware platform
-        -o      OS name
-   --help    Prints the help page.`;
-
-                            // Re-engineered for Ubuntu Mock Output
-                            const sysInfo = {
-                                s: 'Linux',
-                                n: 'ubuntu',
-                                r: '5.15.0-101-generic',
-                                v: '#111-Ubuntu SMP PREEMPT Thu Mar 20 21:32:21 KST 2025',
-                                m: 'x86_64',
-                                p: 'x86_64',
-                                i: 'x86_64',
-                                o: 'GNU/Linux'
-                            };
-
-                            if (args.length === 0) {
-                                simLog('log', sysInfo.s);
-                                break;
-                            }
-
-                            if (args[0] === '--help') {
-                                simLog('log', unameHelpText);
-                                break;
-                            }
-
-                            let flags = args[0];
-                            if (flags.startsWith('-')) {
-                                flags = flags.substring(1);
-                                let output = [];
-                                let invalidFlag = null;
-
-                                for (let char of flags) {
-                                    if (!['a', 'm', 'n', 'r', 's', 'p', 'v', 'i', 'o'].includes(char)) {
-                                        invalidFlag = char;
-                                        break;
-                                    }
-                                }
-
-                                if (invalidFlag) {
-                                    simLog('log', `uname: invalid option -- '${invalidFlag}'\n${unameHelpInvalid}`);
-                                    break;
-                                }
-                                
-                                if (flags.includes('a')) {
-                                    simLog('log', `${sysInfo.s} ${sysInfo.n} ${sysInfo.r} ${sysInfo.v} ${sysInfo.m} ${sysInfo.o}`);
-                                    break;
-                                }
-
-                                const order = ['s', 'n', 'r', 'v', 'm', 'p', 'i', 'o'];
-                                for(let f of order) {
-                                    if(flags.includes(f)) output.push(sysInfo[f]);
-                                }
-                                
-                                if (output.length > 0) {
-                                    simLog('log', output.join(' '));
-                                } else {
-                                    simLog('log', sysInfo.s);
-                                }
-                            } else {
-                                simLog('error', `uname: extra operand '${args[0]}'\nTry 'uname --help' for more information.`);
-                            }
-                            break;
-                        case 'curl':
-                            if (args.length > 0) {
-                                simLog('log', `Fetching ${args[0]}...`);
-                                const res = await fetch(args[0]);
-                                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                                const text = await res.text();
-                                simLog('log', text.substring(0, 200) + (text.length > 200 ? '\n...[truncated]' : ''));
-                            } else {
-                                simLog('error', 'curl: no URL specified');
-                            }
-                            break;
-                        default:
-                            simLog('error', `bash: ${cmd}: command not found`);
-                    }
-                } catch (err) {
-                    simLog('error', `${cmd}: failed - ${err.message}`);
-                }
-            }
-        }
-
-        function simLog(type, msg) {
-            const out = document.getElementById('console-output');
-            const logLine = document.createElement('div');
-            logLine.className = 'log-line log-' + type;
-            logLine.innerHTML = '<span>&gt;&nbsp;</span>' + '<span>' + escapeHTML(msg) + '</span>';
-            out.appendChild(logLine);
-            out.scrollTop = out.scrollHeight;
         }
 
         function escapeHTML(str) {
@@ -763,10 +633,10 @@ Print system information
             document.getElementById('console-output').innerHTML = '';
         }
 
-        function systemLog(msg) {
+        function systemLog(msg, typeClass = 'log-system') {
             const out = document.getElementById('console-output');
             if(out) {
-                out.innerHTML += '<div class="log-line log-system">' + msg + '</div>';
+                out.innerHTML += `<div class="log-line ${typeClass}">${msg}</div>`;
                 out.scrollTop = out.scrollHeight;
             }
         }
@@ -776,14 +646,18 @@ Print system information
             clearConsole();
             systemLog('System: Initiating build sequence...');
 
-            const shellFiles = files.filter(f => f.type === 'shell' || f.name.endsWith('.sh'));
-            for (let shFile of shellFiles) {
-                await executeShellScript(shFile.content);
-            }
-
             let htmlBase = '';
             let cssBlock = '';
             let jsBlock = '';
+            
+            // For QmlWeb integration, we inject the primary QML file as a script block.
+            let mainQmlFile = files.find(f => f.name === 'main.qml') || files.find(f => f.type === 'qml' || f.name.endsWith('.qml'));
+            let qmlBlock = '';
+
+            if (mainQmlFile) {
+                systemLog(`QML Engine: Targeting ${mainQmlFile.name} for rendering context.`);
+                qmlBlock = `<script type="text/qml" id="qml-source-code">${escapeHTML(mainQmlFile.content)}<\/script>`;
+            }
 
             files.forEach(f => {
                 if(f.type === 'html' || f.name.endsWith('.html')) htmlBase += f.content + '\n';
@@ -791,10 +665,43 @@ Print system information
                 if(f.type === 'javascript' || f.name.endsWith('.js')) jsBlock += f.content + '\n';
             });
 
-            const finalDocument = htmlBase + "\n" +
-                "<style>\n" + cssBlock + "\n</style>\n" +
-                consoleHijackScript + "\n" +
-                "<script>\n" + jsBlock + "\n</scr" + "ipt>";
+            const finalDocument = `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>${cssBlock}</style>
+    <script type="text/javascript" src="qmlweb.js"><\/script>
+    ${consoleHijackScript}
+</head>
+<body style="margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: transparent;">
+    <div id="qml-root" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 10;"></div>
+    
+    <div id="html-layer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none;">
+        ${htmlBase}
+    </div>
+
+    ${qmlBlock}
+
+    <script>
+        window.addEventListener('load', function() {
+            var qmlScript = document.getElementById('qml-source-code');
+            if (qmlScript && typeof QmlWeb !== 'undefined') {
+                try {
+                    var engine = new QmlWeb.QMLEngine(document.getElementById('qml-root'));
+                    engine.loadQML(qmlScript.textContent);
+                    engine.start();
+                    console.log("QML Context Successfully Initialized");
+                } catch (e) {
+                    console.error("QML Runtime Exception: " + e.message);
+                }
+            } else if (qmlScript) {
+                console.error("Critical: QmlWeb library not loaded. Check path to /lib/qmlweb.js");
+            }
+        });
+    <\/script>
+    <script>${jsBlock}<\/script>
+</body>
+</html>`;
 
             document.getElementById('preview').srcdoc = finalDocument;
         }
@@ -807,7 +714,7 @@ Print system information
                 if (f.type === 'html') mime = 'text/html';
                 if (f.type === 'css') mime = 'text/css';
                 if (f.type === 'javascript') mime = 'text/javascript';
-                if (f.type === 'shell') mime = 'application/x-sh';
+                if (f.type === 'qml') mime = 'text/x-qml';
 
                 const blob = new Blob([f.content], { type: mime });
                 const url = URL.createObjectURL(blob);
@@ -822,23 +729,7 @@ Print system information
             systemLog('System Workspace Dump: All assets downloaded.');
         }
 
-        if (isAceActive) {
-            editorInstance.on("change", () => {
-                const activeFile = files.find(f => f.id === activeFileId);
-                if (activeFile) activeFile.content = editorInstance.getValue();
-                safeSetItem('ide_files', JSON.stringify(files));
-            });
-        } else {
-            const el = document.getElementById('fallback-textarea');
-            if (el) {
-                el.addEventListener('input', () => {
-                    const activeFile = files.find(f => f.id === activeFileId);
-                    if (activeFile) activeFile.content = el.value;
-                    safeSetItem('ide_files', JSON.stringify(files));
-                });
-            }
-        }
-
+        // Startup Trigger
         switchTab(activeFileId);
         runCode();
     </script>
