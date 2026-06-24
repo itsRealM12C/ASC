@@ -1,2 +1,2 @@
-# BSC
-Simple Visual Studio Code like UI.
+# ASC
+Advanced Code Editor for HTML
