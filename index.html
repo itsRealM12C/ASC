@@ -1,738 +1,491 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BSCode Editor</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.6/ace.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.6/ext-language_tools.js"></script>
-    <style>
-        :root {
-            --bg-main: #1e1e1e;
-            --bg-tabs: #252526;
-            --bg-tab-inactive: #2d2d2d;
-            --bg-tab-hover: #2b2d2e;
-            --border-color: #333;
-            --accent: #007acc;
-            --accent-hover: #0062a3;
-            --text-main: #d4d4d4;
-            --text-muted: #969696;
-            --console-bg: #111111;
-            --error-color: #f48771;
-            --warn-color: #cca700;
-            --qml-color: #41cd52;
-            --border-line: #1c1c1c;
-        }
-
-        body.light-mode {
-            --bg-main: #ffffff;
-            --bg-tabs: #f3f3f3;
-            --bg-tab-inactive: #ececec;
-            --bg-tab-hover: #e0e0e0;
-            --border-color: #cccccc;
-            --text-main: #333333;
-            --text-muted: #666666;
-            --console-bg: #f9f9f9;
-            --border-line: #eaeaea;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        body, html {
-            height: 100%;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-main);
-            color: var(--text-main);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            transition: background-color 0.2s, color 0.2s;
-        }
-
-        /* Header & Tabs */
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background-color: var(--bg-tabs);
-            border-bottom: 1px solid var(--border-color);
-            overflow-x: auto;
-            scrollbar-width: none;
-        }
-        .header::-webkit-scrollbar { display: none; }
-
-        .tabs-container {
-            display: flex;
-            flex-grow: 1;
-            align-items: flex-end;
-            min-height: 40px;
-        }
-
-        .tab {
-            background-color: var(--bg-tab-inactive);
-            color: var(--text-muted);
-            border: none;
-            padding: 8px 14px;
-            cursor: pointer;
-            font-family: Consolas, 'Courier New', monospace;
-            font-size: 13px;
-            border-top: 2px solid transparent;
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            user-select: none;
-            touch-action: none;
-            transition: background-color 0.2s, color 0.2s;
-        }
-
-        .tab:hover { background-color: var(--bg-tab-hover); }
-        .tab.active {
-            background-color: var(--bg-main);
-            color: var(--text-main);
-            border-top: 2px solid var(--accent);
-        }
-        .tab.dragging {
-            opacity: 0.5;
-            background-color: var(--accent);
-        }
-
-        .close-tab {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 4px;
-            width: 16px;
-            height: 16px;
-            color: var(--text-muted);
-            transition: background-color 0.2s, color 0.2s;
-        }
-        .close-tab:hover {
-            background-color: rgba(128, 128, 128, 0.2);
-            color: #ff5f56;
-        }
-
-        .add-tab-btn {
-            background: transparent;
-            color: var(--text-muted);
-            border: none;
-            padding: 0 15px;
-            height: 40px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: color 0.2s;
-        }
-        .add-tab-btn:hover { color: var(--accent); }
-
-        .actions { 
-            display: flex; 
-            align-items: center; 
-            padding-right: 10px; 
-            gap: 6px;
-        }
-        
-        .actions button {
-            background-color: var(--accent);
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            cursor: pointer;
-            border-radius: 3px;
-            font-weight: 600;
-            font-size: 12px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            transition: background-color 0.2s;
-        }
-        .actions button:hover { background-color: var(--accent-hover); }
-
-        /* Configuration Utility Bar */
-        .utility-bar {
-            background-color: var(--bg-main);
-            border-bottom: 1px solid var(--border-color);
-            padding: 4px 12px;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-        .utility-bar label {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            cursor: pointer;
-        }
-        .utility-bar select {
-            background: var(--bg-tabs);
-            color: var(--text-main);
-            border: 1px solid var(--border-color);
-            border-radius: 3px;
-            padding: 2px 4px;
-            outline: none;
-        }
-
-        /* Work Area */
-        .workspace {
-            display: flex;
-            flex: 1;
-            flex-direction: column;
-            height: calc(100% - 72px);
-        }
-        @media (min-width: 768px) {
-            .workspace { flex-direction: row; }
-        }
-
-        /* Editor Frame */
-        #editor {
-            flex: 1;
-            height: 50vh;
-            width: 100%;
-            position: relative;
-        }
-        @media (min-width: 768px) {
-            #editor { height: 100%; width: 50%; }
-        }
-
-        /* Fallback Textarea Engine */
-        #fallback-textarea {
-            width: 100%;
-            height: 100%;
-            background-color: var(--bg-main);
-            color: var(--text-main);
-            border: none;
-            padding: 15px;
-            font-family: Consolas, 'Courier New', monospace;
-            font-size: 14px;
-            line-height: 1.5;
-            resize: none;
-            outline: none;
-        }
-
-        /* Output Viewport & Console Layout */
-        .output-panel {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            border-top: 2px solid var(--accent);
-            height: 50vh;
-            width: 100%;
-            background-color: #fff;
-        }
-        @media (min-width: 768px) {
-            .output-panel { height: 100%; width: 50%; border-top: none; border-left: 2px solid var(--accent); }
-        }
-
-        #preview {
-            flex: 2;
-            width: 100%;
-            background: transparent;
-            border: none;
-        }
-
-        .console-container {
-            flex: 1;
-            background-color: var(--console-bg);
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-        }
-        .console-header {
-            background: var(--bg-tabs);
-            padding: 6px 12px;
-            font-size: 12px;
-            color: var(--text-muted);
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .console-clear-btn {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            cursor: pointer;
-            transition: color 0.2s;
-        }
-        .console-clear-btn:hover { color: var(--accent); }
-
-        #console-output {
-            flex: 1;
-            overflow-y: auto;
-            padding: 10px;
-            font-family: Consolas, monospace;
-            font-size: 12px;
-            color: var(--text-main);
-        }
-        .log-line { 
-            padding: 3px 0; 
-            border-bottom: 1px solid var(--border-line); 
-            word-wrap: break-word; 
-            white-space: pre-wrap; 
-            display: flex; 
-            gap: 6px; 
-        }
-        .log-error { color: var(--error-color); background: rgba(244, 135, 113, 0.05); }
-        .log-warn { color: var(--warn-color); background: rgba(204, 167, 0, 0.05); }
-        .log-system { color: #888; font-style: italic; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>CodeForge Editor</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=DM+Sans:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/shell/shell.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closetag.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/brace-fold.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/indent-fold.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/search.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/jump-to-line.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/anyword-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/javascript-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/css-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/html-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/xml-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/mode/simple.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/comment/comment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt-stdlib.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/js-beautify@1.15.1/js/beautify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/js-beautify@1.15.1/js/beautify-css.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/js-beautify@1.15.1/js/beautify-html.min.js"></script>
+<style>
+:root{--bg0:#090b10;--bg1:#0d1117;--bg2:#161b22;--bg3:#1c2128;--bg4:#21262d;--bg5:#2d333b;--border:#30363d;--border2:#3d444d;--text:#e6edf3;--text2:#b1bac4;--muted:#6e7681;--subtle:#484f58;--accent:#f0883e;--accent2:#d29922;--accent-bg:rgba(240,136,62,.12);--accent-glow:rgba(240,136,62,.25);--green:#3fb950;--green-bg:rgba(63,185,80,.12);--red:#f85149;--red-bg:rgba(248,81,73,.12);--blue:#58a6ff;--blue-bg:rgba(88,166,255,.12);--purple:#d2a8ff;--cyan:#79c0ff;--header-h:42px;--tab-h:36px;--status-h:26px;--activity-w:46px;--mob-bar-h:52px;--font-mono:'JetBrains Mono',monospace;--font-ui:'DM Sans',sans-serif;--radius:6px;--font-size:13.5px; -webkit-tap-highlight-color: rgba(255,255,255,0)}
+.light{--bg0:#f0f2f5;--bg1:#fff;--bg2:#f6f8fa;--bg3:#e8ebef;--bg4:#d0d7de;--bg5:#afb8c1;--border:#d0d7de;--border2:#afb8c1;--text:#1f2328;--text2:#424a53;--muted:#656d76;--subtle:#8b949e;--accent:#cf6416;--accent2:#9a6700;--accent-bg:rgba(207,100,22,.1);--accent-glow:rgba(207,100,22,.2);--green:#1a7f37;--green-bg:rgba(26,127,55,.1);--red:#cf222e;--red-bg:rgba(207,34,46,.1);--blue:#0969da;--blue-bg:rgba(9,105,218,.1);--purple:#8250df;--cyan:#0550ae}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-ui);background:var(--bg0);color:var(--text);overflow:hidden;height:100vh;height:100dvh;width:100vw}
+::-webkit-scrollbar{width:7px;height:7px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:4px}
+#app{display:flex;height:100vh;height:100dvh;width:100vw}
+#activity-bar{width:var(--activity-w);background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 0;flex-shrink:0;z-index:50}
+.act-top,.act-bottom{display:flex;flex-direction:column;align-items:center;gap:2px}
+.act-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--muted);border-radius:var(--radius);cursor:pointer;font-size:16px;transition:all .18s;position:relative}
+.act-btn:hover{color:var(--text2);background:var(--bg3)}.act-btn.active{color:var(--accent)}.act-btn.active::before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:2px;background:var(--accent);border-radius:0 2px 2px 0}.act-btn:active{transform:scale(.92)}
+.act-tip{position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);background:var(--bg5);color:var(--text);font-size:11px;padding:4px 10px;border-radius:4px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,.3)}.act-btn:hover .act-tip{opacity:1}
+#main-col{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
+header{height:var(--header-h);background:var(--bg1);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 10px;gap:6px;flex-shrink:0}
+.logo{display:flex;align-items:center;gap:7px;font-weight:900;font-size:14px;letter-spacing:-.3px;color:var(--accent);white-space:nowrap;flex-shrink:0}.logo i{font-size:16px;filter:drop-shadow(0 0 6px var(--accent-glow))}
+.toolbar{display:flex;align-items:center;gap:1px;margin-left:8px}
+.tb{display:inline-flex;align-items:center;justify-content:center;gap:5px;height:30px;min-width:30px;padding:0 8px;border:1px solid transparent;background:transparent;color:var(--text2);font-family:var(--font-ui);font-size:12px;font-weight:500;border-radius:var(--radius);cursor:pointer;white-space:nowrap;transition:all .18s;position:relative}
+.tb:hover{background:var(--accent-bg);color:var(--accent);border-color:rgba(240,136,62,.15)}.tb:active{transform:scale(.95)}.tb.active{background:var(--accent-bg);color:var(--accent);border-color:rgba(240,136,62,.2)}.tb i{font-size:13px}
+.tb-run{background:var(--green-bg);color:var(--green);border-color:rgba(63,185,80,.2)}.tb-run:hover{background:var(--green);color:#fff;border-color:var(--green)}
+.tb-stop{background:var(--red-bg);color:var(--red);border-color:rgba(248,81,73,.2);display:none}.tb-stop.vis{display:inline-flex}.tb-stop:hover{background:var(--red);color:#fff;border-color:var(--red)}
+.tsep{width:1px;height:18px;background:var(--border);margin:0 4px;flex-shrink:0}.hsp{flex:1}
+#tab-bar{height:var(--tab-h);background:var(--bg1);display:flex;align-items:stretch;border-bottom:1px solid var(--border);flex-shrink:0}
+#tabs-scroll{display:flex;align-items:stretch;flex:1;overflow-x:auto;scrollbar-width:none}#tabs-scroll::-webkit-scrollbar{display:none}
+.tab{display:flex;align-items:center;gap:5px;padding:0 12px;font-size:12px;color:var(--muted);cursor:pointer;border-right:1px solid var(--border);white-space:nowrap;position:relative;transition:all .12s;min-width:0;max-width:160px;user-select:none;flex-shrink:0}
+.tab:hover{background:var(--bg2);color:var(--text2)}.tab.active{background:var(--bg0);color:var(--text)}.tab.active::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent)}
+.tab-ico{font-size:11px;flex-shrink:0}.tab-ico.python{color:#3572A5}.tab-ico.shell{color:#89E051}.tab-ico.qml{color:#44CC11}.tab-ico.javascript{color:#F7DF1E}.tab-ico.htmlmixed{color:#E34C26}.tab-ico.css{color:#563D7C}
+.tab-nm{overflow:hidden;text-overflow:ellipsis;min-width:0}.tab-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;opacity:0;transition:opacity .15s}.tab.dirty .tab-dot{opacity:1}
+.tab-x{display:flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;font-size:9px;color:var(--subtle);cursor:pointer;flex-shrink:0;transition:all .12s;opacity:0;margin-left:2px}.tab:hover .tab-x,.tab.active .tab-x{opacity:.7}.tab-x:hover{background:var(--red);color:#fff;opacity:1!important}
+.tab-add{display:flex;align-items:center;justify-content:center;width:34px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:13px;flex-shrink:0;transition:all .12s}.tab-add:hover{background:var(--bg2);color:var(--accent)}
+#editor-area{flex:1;display:flex;overflow:hidden;position:relative;min-height:0}
+#editor-pane{flex:1;overflow:hidden;min-width:0;min-height:0;position:relative}
+#editor-wrap{position:absolute;top:0;left:0;right:0;bottom:0}
+#welcome{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg0);z-index:5;gap:20px;overflow-y:auto;padding:20px}#welcome.hidden{display:none}
+.welcome-icon{font-size:56px;color:var(--accent);opacity:.6;animation:pulse 3s ease-in-out infinite}@keyframes pulse{0%,100%{opacity:.4;transform:scale(1)}50%{opacity:.7;transform:scale(1.05)}}
+.welcome-title{font-size:28px;font-weight:900;letter-spacing:-.5px;color:var(--text)}.welcome-sub{font-size:14px;color:var(--muted);text-align:center;max-width:360px;line-height:1.6}
+.welcome-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.wa-btn{display:flex;align-items:center;gap:8px;padding:10px 20px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);font-family:var(--font-ui);font-size:13px;font-weight:600;cursor:pointer;transition:all .18s}.wa-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}.wa-btn i{font-size:14px}
+.wa-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}.wa-btn.primary:hover{filter:brightness(1.1)}
+.welcome-keys{display:flex;flex-direction:column;gap:6px;margin-top:8px}.wk-row{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--subtle)}.wk-key{background:var(--bg3);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px;color:var(--text2);border:1px solid var(--border)}
+#resize-h{width:5px;cursor:col-resize;background:var(--border);flex-shrink:0;transition:background .12s;z-index:10;display:none}#resize-h:hover,#resize-h.active{background:var(--accent)}
+#preview-pane{width:45%;min-width:180px;display:none;flex-direction:column;background:var(--bg1);border-left:1px solid var(--border);overflow:hidden;min-height:0}#preview-pane.open{display:flex}
+.pane-head{display:flex;align-items:center;justify-content:space-between;padding:5px 12px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+.pane-head button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 6px;border-radius:4px;transition:all .12s}.pane-head button:hover{color:var(--text);background:var(--bg4)}
+#preview-body{flex:1;overflow:auto;background:#fff;min-height:0}
+#output-pane{height:0;display:flex;flex-direction:column;background:var(--bg1);border-top:1px solid var(--border);overflow:hidden;transition:height .22s ease;min-height:0}#output-pane.open{height:180px}
+.out-head{display:flex;align-items:center;justify-content:space-between;padding:5px 12px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+.out-tabs{display:flex;gap:0}.out-tab{padding:3px 10px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:4px 4px 0 0;border:none;background:none;transition:all .12s}.out-tab:hover{color:var(--text2)}.out-tab.active{color:var(--accent);background:var(--accent-bg)}
+.out-btns{display:flex;gap:2px}.out-btns button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 6px;border-radius:4px;transition:all .12s}.out-btns button:hover{color:var(--text);background:var(--bg4)}
+#output-body{flex:1;overflow:auto;padding:8px 14px;font-family:var(--font-mono);font-size:12px;line-height:1.65;white-space:pre-wrap;word-wrap:break-word;color:var(--text2);min-height:0}
+#status-bar{height:var(--status-h);background:var(--bg2);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-size:11px;color:var(--muted);flex-shrink:0}
+.st-left,.st-right{display:flex;align-items:center;gap:12px}.st-item{display:flex;align-items:center;gap:4px;cursor:default}.st-item i{font-size:9px}.st-item.click{cursor:pointer;padding:1px 6px;border-radius:3px;transition:all .12s}.st-item.click:hover{background:var(--accent-bg);color:var(--accent)}
+.CodeMirror{height:100%!important;font-family:var(--font-mono)!important;font-size:var(--font-size);line-height:1.6}.CodeMirror-gutters{border-right:none!important}
+.cm-s-cf-dark.CodeMirror{background:var(--bg0);color:var(--text)}.cm-s-cf-dark .CodeMirror-gutters{background:var(--bg1);border-right:1px solid var(--border)}.cm-s-cf-dark .CodeMirror-linenumber{color:var(--subtle);padding:0 8px 0 14px;font-size:12px}.cm-s-cf-dark .CodeMirror-cursor{border-left:2px solid var(--accent)}.cm-s-cf-dark .CodeMirror-activeline-background{background:rgba(240,136,62,.04)}.cm-s-cf-dark .CodeMirror-selected{background:rgba(240,136,62,.15)}.cm-s-cf-dark .CodeMirror-matchingbracket{color:var(--accent)!important;background:rgba(240,136,62,.2);outline:1px solid var(--accent)}.cm-s-cf-dark .CodeMirror-nonmatchingbracket{color:var(--red)!important}
+.cm-s-cf-dark .cm-keyword{color:#ff7b72}.cm-s-cf-dark .cm-def{color:#d2a8ff}.cm-s-cf-dark .cm-variable{color:#ffa657}.cm-s-cf-dark .cm-variable-2{color:#79c0ff}.cm-s-cf-dark .cm-variable-3,.cm-s-cf-dark .cm-type{color:#ffa657}.cm-s-cf-dark .cm-property{color:#79c0ff}.cm-s-cf-dark .cm-operator{color:#ff7b72}.cm-s-cf-dark .cm-number{color:#79c0ff}.cm-s-cf-dark .cm-string,.cm-s-cf-dark .cm-string-2{color:#a5d6ff}.cm-s-cf-dark .cm-comment{color:#6e7681;font-style:italic}.cm-s-cf-dark .cm-atom{color:#79c0ff}.cm-s-cf-dark .cm-builtin{color:#ffa657}.cm-s-cf-dark .cm-tag{color:#7ee787}.cm-s-cf-dark .cm-attribute{color:#79c0ff}.cm-s-cf-dark .cm-bracket{color:var(--text2)}.cm-s-cf-dark .CodeMirror-foldgutter-open,.cm-s-cf-dark .CodeMirror-foldgutter-folded{color:var(--subtle)}.cm-s-cf-dark .CodeMirror-foldmarker{color:var(--accent);background:var(--accent-bg);text-shadow:none;font-family:var(--font-ui);font-size:11px}.cm-s-cf-dark .CodeMirror-dialog{background:var(--bg2);border-bottom:1px solid var(--border);color:var(--text);padding:4px 12px;font-size:12px}.cm-s-cf-dark .CodeMirror-dialog input{background:var(--bg0);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-family:var(--font-mono);font-size:12px}
+.cm-s-cf-dark .CodeMirror-hints{background:var(--bg2);border:1px solid var(--border2);border-radius:8px;font-family:var(--font-mono);font-size:12px;box-shadow:0 8px 30px rgba(0,0,0,.5);padding:4px;max-height:260px;overflow-y:auto}.cm-s-cf-dark .CodeMirror-hint{color:var(--text2);padding:4px 10px;border-radius:4px}.cm-s-cf-dark .CodeMirror-hint-active{background:var(--accent);color:#fff}
+.cm-s-cf-light.CodeMirror{background:#fff;color:#1f2328}.cm-s-cf-light .CodeMirror-gutters{background:#f6f8fa;border-right:1px solid #d0d7de}.cm-s-cf-light .CodeMirror-linenumber{color:#8b949e;padding:0 8px 0 14px;font-size:12px}.cm-s-cf-light .CodeMirror-cursor{border-left:2px solid var(--accent)}.cm-s-cf-light .CodeMirror-activeline-background{background:rgba(207,100,22,.05)}.cm-s-cf-light .CodeMirror-selected{background:rgba(207,100,22,.12)}.cm-s-cf-light .CodeMirror-matchingbracket{color:var(--accent)!important;background:rgba(207,100,22,.15)}.cm-s-cf-light .cm-keyword{color:#cf222e}.cm-s-cf-light .cm-def{color:#8250df}.cm-s-cf-light .cm-variable{color:#953800}.cm-s-cf-light .cm-variable-2{color:#0550ae}.cm-s-cf-light .cm-string{color:#0a3069}.cm-s-cf-light .cm-comment{color:#6e7781;font-style:italic}.cm-s-cf-light .cm-tag{color:#116329}.cm-s-cf-light .cm-attribute{color:#0550ae}.cm-s-cf-light .cm-builtin{color:#8250df}.cm-s-cf-light .cm-number{color:#0550ae}.cm-s-cf-light .cm-atom{color:#0550ae}.cm-s-cf-light .cm-property{color:#0550ae}.cm-s-cf-light .cm-operator{color:#cf222e}.cm-s-cf-light .CodeMirror-hints{background:#fff;border:1px solid #d0d7de;border-radius:8px;font-family:var(--font-mono);font-size:12px;box-shadow:0 8px 30px rgba(0,0,0,.12);padding:4px;max-height:260px;overflow-y:auto}.cm-s-cf-light .CodeMirror-hint{color:#424a53;padding:4px 10px;border-radius:4px}.cm-s-cf-light .CodeMirror-hint-active{background:var(--accent);color:#fff}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding-top:14vh;animation:fadeIn .12s}.modal-bg.hidden{display:none}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes popIn{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+.cmd-box,.modal-box{background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 16px 48px rgba(0,0,0,.4);overflow:hidden;animation:popIn .15s;width:92%;max-width:540px}
+#cmd-input{width:100%;padding:12px 16px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:14px;outline:none}#cmd-input::placeholder{color:var(--subtle)}
+#cmd-list{list-style:none;max-height:260px;overflow-y:auto;padding:4px}#cmd-list li{padding:7px 14px;cursor:pointer;border-radius:var(--radius);font-size:13px;color:var(--text2);display:flex;align-items:center;gap:10px;transition:all .08s}#cmd-list li:hover,#cmd-list li.sel{background:var(--accent-bg);color:var(--accent)}#cmd-list li i{width:16px;text-align:center;font-size:12px;color:var(--subtle)}#cmd-list li:hover i,#cmd-list li.sel i{color:var(--accent)}#cmd-list li .sc{margin-left:auto;font-size:10px;color:var(--subtle);font-family:var(--font-mono);background:var(--bg3);padding:1px 6px;border-radius:3px}
+.modal-box h3{padding:16px 20px 0;font-size:15px;font-weight:700;color:var(--text)}.modal-box p.desc{padding:4px 20px 0;font-size:12px;color:var(--muted)}
+.modal-box input,.modal-box select{width:calc(100% - 40px);margin:12px 20px;padding:8px 12px;background:var(--bg0);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font-ui);font-size:13px;outline:none;transition:border-color .15s}.modal-box input:focus,.modal-box select:focus{border-color:var(--accent)}.modal-box select option{background:var(--bg2);color:var(--text)}
+.m-acts{display:flex;justify-content:flex-end;gap:8px;padding:10px 20px 16px}.m-acts button{padding:7px 18px;border-radius:var(--radius);font-family:var(--font-ui);font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);transition:all .15s}.m-cancel{background:transparent;color:var(--text2)}.m-cancel:hover{background:var(--bg4)}.m-ok{background:var(--accent);color:#fff;border-color:var(--accent)}.m-ok:hover{filter:brightness(1.1)}
+#toasts{position:fixed;bottom:60px;right:14px;z-index:2000;display:flex;flex-direction:column-reverse;gap:6px}.toast{padding:10px 16px;border-radius:8px;font-size:12px;font-weight:500;color:#fff;display:flex;align-items:center;gap:8px;animation:slideIn .2s;box-shadow:0 4px 16px rgba(0,0,0,.3);max-width:300px}.toast.ok{background:var(--green)}.toast.err{background:var(--red)}.toast.inf{background:var(--blue)}.toast.wrn{background:var(--accent2)}@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+#ctx{position:fixed;background:var(--bg2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:1500;padding:4px;min-width:170px;display:none}.ctx-i{padding:6px 12px;font-size:12px;color:var(--text2);cursor:pointer;border-radius:4px;display:flex;align-items:center;gap:8px;transition:all .08s}.ctx-i:hover{background:var(--accent-bg);color:var(--accent)}.ctx-i i{padding-right:6px;width:14px;text-align:center;font-size:11px;color:var(--subtle)}.ctx-i:hover i{color:var(--accent)}.ctx-s{height:1px;background:var(--border);margin:4px 8px}
+#mob-bar{display:none;position:fixed;bottom:0;left:0;right:0;height:var(--mob-bar-h);background:var(--bg1);border-top:1px solid var(--border);z-index:900;padding:0 4px;align-items:center;justify-content:space-around;box-shadow:0 -2px 12px rgba(0,0,0,.2)}
+.mb{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:9px;font-weight:600;padding:6px 4px;border-radius:8px;transition:all .12s;min-width:44px;font-family:var(--font-ui)}.mb i{font-size:18px;transition:all .12s}.mb:active{transform:scale(.9)}.mb.active{color:var(--accent)}.mb.run{color:var(--green)}.mb.run:active{background:var(--green-bg)}
+#mob-sheet{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);border-radius:16px 16px 0 0;z-index:950;padding:8px 0 env(safe-area-inset-bottom,8px);box-shadow:0 -4px 24px rgba(0,0,0,.4);animation:slideUp .2s}#mob-sheet.open{display:block}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sheet-handle{width:36px;height:4px;background:var(--bg4);border-radius:2px;margin:4px auto 12px}
+.sheet-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:0 12px}
+.sg-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:12px 4px;border:none;background:transparent;color:var(--text2);cursor:pointer;border-radius:10px;transition:all .12s;font-family:var(--font-ui);font-size:10px;font-weight:600}.sg-btn:active{background:var(--accent-bg);transform:scale(.95)}.sg-btn i{font-size:20px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:var(--bg3)}.sg-btn:active i{background:var(--accent-bg);color:var(--accent)}
+.sheet-divider{height:1px;background:var(--border);margin:8px 16px}
+.sheet-row{display:flex;justify-content:center;gap:16px;padding:8px 16px}
+.sr-btn{display:flex;align-items:center;gap:8px;padding:10px 20px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text2);cursor:pointer;font-family:var(--font-ui);font-size:13px;font-weight:600;transition:all .12s}.sr-btn:active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}.sr-btn i{font-size:16px}
+#mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:940}#mob-overlay.open{display:block}
+@media(max-width:768px){:root{--activity-w:0px;--status-h:0px}#activity-bar{display:none}.tb span{display:none}.tb{min-width:28px;padding:0 5px}.tab{padding:0 8px;max-width:100px;font-size:11px}#mob-bar{display:flex}#status-bar{display:none}#toasts{bottom:calc(var(--mob-bar-h) + 8px)}body{padding-bottom:var(--mob-bar-h)}#app{height:calc(100dvh - var(--mob-bar-h))}.modal-bg{padding-top:10vh}}
+@media(prefers-reduced-motion:reduce){*{animation-duration:0s!important;transition-duration:0s!important}}
+</style>
+<script>
+(function(){
+  // pick a random hue between red (≈10°) and yellow (≈50°)
+  const h = Math.floor(Math.random() * (50 - 10 + 1)) + 10;
+  const root = document.documentElement.style;
+  // primary accent (vibrant)
+  root.setProperty('--accent', `hsl(${h} 90% 55%)`);
+  // secondary accent (darker)
+  root.setProperty('--accent2', `hsl(${Math.min(60, h + 18)} 72% 44%)`);
+  // semitransparent background and glow using HSLA
+  root.setProperty('--accent-bg', `hsla(${h},90%,55%,0.12)`);
+  root.setProperty('--accent-glow', `hsla(${h},90%,55%,0.25)`);
+  // ensure mobile copy/paste works smoothly by allowing user selection & touch action
+  const mobileCss = `
+    .CodeMirror, .CodeMirror * { -webkit-user-select: text !important; user-select: text !important; }
+    #preview-body, #output-body { -webkit-user-select: text; user-select: text; touch-action: manipulation; }
+  `;
+  const s = document.createElement('style');
+  s.dataset.generated = 'accent-mobile-select';
+  s.appendChild(document.createTextNode(mobileCss));
+  document.head.appendChild(s);
+})();
+</script>
 </head>
 <body>
+<div id="toasts"></div><div id="ctx"></div><div id="mob-overlay"></div>
+<!-- hidden file input for upload/import -->
+<input id="file-import" type="file" accept="*/*" style="display:none">
+<div id="cmd-pal" class="modal-bg hidden"><div class="cmd-box"><input type="text" id="cmd-input" placeholder="Type a command..." autocomplete="off" spellcheck="false"><ul id="cmd-list"></ul></div></div>
+<div id="new-modal" class="modal-bg hidden"><div class="modal-box"><h3>New File</h3><p class="desc">Choose a name and language.</p><input type="text" id="nf-name" placeholder="filename.ext" autocomplete="off" spellcheck="false"><select id="nf-lang"><option value="python">Python (.py)</option><option value="shell">Shell (.sh)</option><option value="qml">QML (.qml)</option><option value="javascript">JavaScript (.js)</option><option value="htmlmixed">HTML (.html)</option><option value="css">CSS (.css)</option></select><div class="m-acts"><button class="m-cancel" onclick="closeModal('new-modal')">Cancel</button><button class="m-ok" onclick="createFile()">Create</button></div></div></div>
+<div id="rename-modal" class="modal-bg hidden"><div class="modal-box"><h3>Rename</h3><input type="text" id="rn-name" placeholder="newname.ext" autocomplete="off" spellcheck="false"><div class="m-acts"><button class="m-cancel" onclick="closeModal('rename-modal')">Cancel</button><button class="m-ok" onclick="doRename()">Rename</button></div></div></div>
+<div id="export-modal" class="modal-bg hidden"><div class="modal-box"><h3>Export</h3><p class="desc">Download or copy your code.</p><div style="padding:16px 20px;display:flex;gap:8px;flex-wrap:wrap"><button class="m-ok" style="flex:1;min-width:120px" onclick="doExport('file')"><i class="fas fa-file-arrow-down" style="margin-right:6px"></i>Download</button><button class="m-cancel" style="flex:1;min-width:120px" onclick="doExport('clipboard')"><i class="fas fa-clipboard" style="margin-right:6px"></i>Copy</button></div><div class="m-acts"><button class="m-cancel" onclick="closeModal('export-modal')">Close</button></div></div></div>
+<div id="mob-sheet"><div class="sheet-handle"></div><div class="sheet-grid"><button class="sg-btn" onclick="prettyPrint();closeSheet()"><i class="fas fa-wand-magic-sparkles"></i>Format</button><button class="sg-btn" onclick="toggleWrap();closeSheet()"><i class="fas fa-text-width"></i>Wrap</button><button class="sg-btn" onclick="foldAll();closeSheet()"><i class="fas fa-compress-alt"></i>Fold</button><button class="sg-btn" onclick="unfoldAll();closeSheet()"><i class="fas fa-expand-alt"></i>Unfold</button><button class="sg-btn" onclick="doFind();closeSheet()"><i class="fas fa-search"></i>Find</button><button class="sg-btn" onclick="doReplace();closeSheet()"><i class="fas fa-exchange-alt"></i>Replace</button><button class="sg-btn" onclick="doGoto();closeSheet()"><i class="fas fa-arrow-right"></i>Go Line</button><button class="sg-btn" onclick="doComment();closeSheet()"><i class="fas fa-code"></i>Comment</button><button class="sg-btn" onclick="toggleLive();closeSheet()"><i class="fas fa-eye"></i>Preview</button><button class="sg-btn" onclick="toggleTheme();closeSheet()"><i class="fas fa-circle-half-stroke"></i>Theme</button><button class="sg-btn" onclick="fontBigger();closeSheet()"><i class="fas fa-magnifying-glass-plus"></i>Font+</button><button class="sg-btn" onclick="fontSmaller();closeSheet()"><i class="fas fa-magnifying-glass-minus"></i>Font-</button></div><div class="sheet-divider"></div><div class="sheet-row"><button class="sr-btn" onclick="doExport('file');closeSheet()"><i class="fas fa-download"></i>Export</button><button class="sr-btn" onclick="doExport('clipboard');closeSheet()"><i class="fas fa-share-from-square"></i>Share</button><button class="sr-btn" onclick="clearAllOutput();closeSheet()"><i class="fas fa-broom"></i>Clear</button></div></div>
+<div id="app">
+<aside id="activity-bar"><div class="act-top"><button class="act-btn active" data-p="explorer"><i class="fas fa-copy"></i><span class="act-tip">Explorer</span></button><button class="act-btn" data-p="search"><i class="fas fa-search"></i><span class="act-tip">Search</span></button><button class="act-btn" data-p="git"><i class="fas fa-code-branch"></i><span class="act-tip">Source Control</span></button><button class="act-btn" data-p="ext"><i class="fas fa-puzzle-piece"></i><span class="act-tip">Extensions</span></button></div><div class="act-bottom"><button class="act-btn" id="act-settings"><i class="fas fa-gear"></i><span class="act-tip">Settings</span></button></div></aside>
+<div id="main-col">
+<header><div class="logo"><i class="fas fa-bolt"></i><span>CodeForge</span></div><div class="toolbar"><button class="tb tb-run" id="btn-run" title="Run"><i class="fas fa-play"></i><span>Run</span></button><button class="tb tb-stop" id="btn-stop" title="Stop"><i class="fas fa-stop"></i><span>Stop</span></button><div class="tsep"></div><button class="tb" id="btn-undo" title="Undo"><i class="fas fa-rotate-left"></i><span>Undo</span></button><button class="tb" id="btn-redo" title="Redo"><i class="fas fa-rotate-right"></i><span>Redo</span></button><div class="tsep"></div><button class="tb" id="btn-live" title="Live Preview"><i class="fas fa-eye"></i><span>Live</span></button><button class="tb" id="btn-format" title="Format"><i class="fas fa-wand-magic-sparkles"></i><span>Format</span></button><button class="tb active" id="btn-wrap" title="Wrap"><i class="fas fa-text-width"></i><span>Wrap</span></button><div class="tsep"></div><button class="tb" id="btn-fold" title="Fold"><i class="fas fa-compress-alt"></i></button><button class="tb" id="btn-unfold" title="Unfold"><i class="fas fa-expand-alt"></i></button><div class="tsep"></div><button class="tb" id="btn-find" title="Find"><i class="fas fa-search"></i></button><button class="tb" id="btn-replace" title="Replace"><i class="fas fa-exchange-alt"></i></button><button class="tb" id="btn-goto" title="Go Line"><i class="fas fa-arrow-right"></i></button><div class="tsep"></div><button class="tb" id="btn-comment" title="Comment"><i class="fas fa-code"></i></button></div><div class="hsp"></div><button class="tb" id="btn-theme" title="Theme"><i class="fas fa-moon"></i></button><button class="tb" id="btn-export" title="Export"><i class="fas fa-download"></i></button><button class="tb" id="btn-cmd" title="Commands"><i class="fas fa-terminal"></i></button></header>
+<!-- Sidebar panels for explorer / search / git / extensions -->
+<div id="side-pane" class="side-hidden" aria-hidden="true">
+  <div class="side-head"><strong id="side-title">Explorer</strong><button class="tb" id="side-close" title="Close"><i class="fas fa-times"></i></button></div>
+  <div id="side-body">
+    <!-- Content populated by JS -->
+  </div>
+</div>
+<div id="tab-bar"><div id="tabs-scroll"></div><button class="tab-add" id="btn-add-tab" title="New File"><i class="fas fa-plus"></i></button></div>
+<div id="editor-area"><div id="editor-pane"><div id="editor-wrap"></div><div id="welcome"><div class="welcome-icon"><i class="fas fa-bolt"></i></div><div class="welcome-title">CodeForge</div><div class="welcome-sub">Create a file to start coding. Type &lt; for HTML tags.</div><div class="welcome-actions"><button class="wa-btn primary" onclick="openNewFile()"><i class="fas fa-file-circle-plus"></i>New File</button><button class="wa-btn" onclick="openCmdPal()"><i class="fas fa-terminal"></i>Commands</button></div></div></div><div id="resize-h"></div><div id="preview-pane"><div class="pane-head"><span id="preview-title"><i class="fas fa-eye" style="margin-right:6px"></i>Preview</span><div style="display:flex;gap:2px"><button id="btn-prev-download" title="Download"><i class="fas fa-download"></i></button><button id="btn-prev-refresh" title="Refresh"><i class="fas fa-sync-alt"></i></button><button id="btn-prev-close" title="Close"><i class="fas fa-times"></i></button></div></div><div id="preview-body"></div></div></div>
+<div id="output-pane"><div class="out-head"><div class="out-tabs"><button class="out-tab active" data-ot="output">Output</button><button class="out-tab" data-ot="problems">Problems</button></div><div class="out-btns"><button id="btn-out-clear" title="Clear"><i class="fas fa-eraser"></i></button><button id="btn-out-close" title="Close"><i class="fas fa-times"></i></button></div></div><div id="output-body">Welcome to CodeForge.</div></div>
+<footer id="status-bar"><div class="st-left"><span class="st-item"><i class="fas fa-code-branch"></i> main</span></div><div class="st-right"><span class="st-item click" id="st-cur">Ln 1, Col 1</span><span class="st-item" id="st-ind">Spaces: 4</span><span class="st-item">UTF-8</span><span class="st-item click" id="st-lang">--</span><span class="st-item" id="st-wrap">Wrap: On</span></div></footer>
+</div>
+</div>
+<nav id="mob-bar"><button class="mb" onclick="openNewFile()"><i class="fas fa-file-circle-plus"></i>New</button><button class="mb" onclick="toggleSheet()"><i class="fas fa-folder-open"></i>Files</button><button class="mb" onclick="doUndo()"><i class="fas fa-rotate-left"></i>Undo</button><button class="mb run" onclick="runCode()"><i class="fas fa-play"></i>Run</button><button class="mb" onclick="clearAllOutput()"><i class="fas fa-broom"></i>Clear</button><button class="mb" onclick="toggleMobileOutput()"><i class="fas fa-terminal"></i>Output</button><button class="mb" onclick="openSheet()"><i class="fas fa-ellipsis"></i>More</button></nav>
+<script>
+CodeMirror.defineSimpleMode("qml",{start:[{regex:/"""/,token:"string",next:"ts"},{regex:/"/,token:"string",next:"s"},{regex:/'/,token:"string",next:"ss"},{regex:/\/\/.*$/,token:"comment"},{regex:/\/\*/,token:"comment",next:"c"},{regex:/\b(import|as|on|property|signal|alias|readonly|default|required|component|pragma|id|function|if|else|for|while|do|switch|case|break|continue|return|try|catch|finally|throw|new|this|var|let|const|typeof|instanceof|in|of|with)\b/,token:"keyword"},{regex:/\b(string|int|real|double|bool|var|variant|list|url|color|date|font|point|size|rect|matrix4x4|enumeration)\b/,token:"variable-3"},{regex:/\b(true|false|null|undefined)\b/,token:"atom"},{regex:/\b[A-Z][A-Za-z0-9]*\b/,token:"type"},{regex:/\b[a-z_][A-Za-z0-9_]*(?=\s*:)/,token:"property"},{regex:/[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?/,token:"number"},{regex:/[{}[\]()]/,token:"bracket"},{regex:/[-+\/*=<>!&|^~%]+/,token:"operator"}],c:[{regex:/[^*/]+/,token:"comment"},{regex:/\*\//,token:"comment",next:"start"},{regex:/[/*]/,token:"comment"}],s:[{regex:/[^\\"]+/,token:"string"},{regex:/\\./,token:"string-2"},{regex:/"/,token:"string",next:"start"}],ss:[{regex:/[^\\']+/,token:"string"},{regex:/\\./,token:"string-2"},{regex:/'/,token:"string",next:"start"}],ts:[{regex:/[^"]+/,token:"string"},{regex:/"""$/,token:"string",next:"start"},{regex:/"/,token:"string"}],meta:{electricInput:/[}\]]$/,blockCommentStart:"/*",blockCommentEnd:"*/",lineComment:"//",fold:"brace"}});
+const HINTS={python:["False","None","True","and","as","assert","async","await","break","class","continue","def","del","elif","else","except","finally","for","from","global","if","import","in","is","lambda","nonlocal","not","or","pass","raise","return","try","while","with","yield","abs","all","any","bin","bool","breakpoint","bytearray","bytes","callable","chr","classmethod","compile","complex","delattr","dict","dir","divmod","enumerate","eval","exec","filter","float","format","frozenset","getattr","globals","hasattr","hash","help","hex","id","input","int","isinstance","issubclass","iter","len","list","locals","map","max","memoryview","min","next","object","oct","open","ord","pow","print","property","range","repr","reversed","round","set","setattr","slice","sorted","staticmethod","str","sum","super","tuple","type","vars","zip","self","cls","math","math.sqrt","math.pi","os","sys","json","re","random","datetime","time","collections","itertools","functools","pathlib","typing","List","Dict","Tuple","Set","print(","len(","range(","input(","int(","str(","float(","list(","dict(","set(","sorted(","enumerate(","zip(","map(","filter(","open(","with open(","if __name__"],shell:["echo","cd","pwd","ls","cat","mkdir","rm","cp","mv","grep","find","awk","sed","sort","uniq","wc","head","tail","chmod","chown","df","du","ps","kill","export","source","alias","history","date","sleep","read","printf","tee","xargs","if","then","else","elif","fi","for","while","until","do","done","case","esac","function","return","local","declare","true","false","exit","eval","exec","set","basename","dirname","seq","tr","cut","curl","wget","ssh","echo ","printf ","if [","for ","while ","$0","$1","$#","$@","$?","$$","$HOME","$USER","$PATH","$SHELL","$PWD"],qml:["ApplicationWindow","Window","Item","Rectangle","Text","Image","Button","TextField","TextArea","Switch","Slider","CheckBox","RadioButton","ComboBox","SpinBox","ProgressBar","ListView","GridView","ScrollView","Flickable","MouseArea","Timer","Animation","PropertyAnimation","NumberAnimation","ColorAnimation","SequentialAnimation","ParallelAnimation","Behavior","Transition","State","PropertyChanges","Gradient","GradientStop","FontLoader","Component","Loader","Connections","Binding","Row","Column","RowLayout","ColumnLayout","GridLayout","StackLayout","Label","GroupBox","Frame","Page","Dialog","Menu","ToolBar","ToolButton","anchors.fill","anchors.centerIn","anchors.top","anchors.bottom","anchors.left","anchors.right","anchors.margins","anchors.horizontalCenter","anchors.verticalCenter","width","height","x","y","z","color","radius","border.width","border.color","text","font.pixelSize","font.bold","font.italic","font.family","visible","opacity","clip","rotation","scale","enabled","focus","spacing","padding","margins","wrapMode","source","fillMode","gradient","model","delegate","currentIndex","title","id","property","signal","alias","function","onCompleted","onClicked","onPressed","onReleased","onTextChanged","onValueChanged","Component.onCompleted","Qt.quit","qsTr","import QtQuick 2.15","import QtQuick.Controls 2.15","import QtQuick.Layouts 1.15"],javascript:["break","case","catch","class","const","continue","debugger","default","delete","do","else","export","extends","finally","for","function","if","import","in","instanceof","let","new","of","return","static","super","switch","this","throw","try","typeof","var","void","while","with","yield","true","false","null","undefined","NaN","Infinity","console.log","console.error","console.warn","document.getElementById","document.querySelector","document.querySelectorAll","document.createElement","document.addEventListener","window","window.location","window.localStorage","window.fetch","window.setTimeout","window.setInterval","window.requestAnimationFrame","window.innerWidth","window.innerHeight","parseInt","parseFloat","isNaN","isFinite","JSON.stringify","JSON.parse","Math.PI","Math.abs","Math.ceil","Math.floor","Math.round","Math.max","Math.min","Math.pow","Math.sqrt","Math.random","Array.from","Array.isArray","forEach","map","filter","reduce","find","findIndex","some","every","includes","indexOf","join","reverse","sort","slice","splice","concat","flat","pop","push","shift","unshift","Object.keys","Object.values","Object.entries","Object.assign","Object.freeze","Object.create","hasOwnProperty","toString","valueOf","Promise","Promise.all","Promise.race","Promise.resolve","Promise.reject","then","catch","finally","async","await","Map","Set","Date","Date.now","RegExp","Error","fetch","addEventListener","querySelector","getElementById"],htmlmixed:["html","head","body","div","span","p","a","img","ul","ol","li","h1","h2","h3","h4","h5","h6","table","tr","td","th","form","input","button","select","option","textarea","label","script","style","link","meta","title","header","footer","nav","main","section","article","aside","details","summary","figure","figcaption","mark","time","progress","video","audio","source","canvas","svg","iframe","br","hr","pre","code","blockquote","em","strong","b","i","u","s","sub","sup","small","class=\"","id=\"","style=\"","href=\"","src=\"","alt=\"","type=\"","value=\"","placeholder=\"","required","disabled","hidden","width=\"","height=\""],css:["align-content","align-items","align-self","animation","animation-delay","animation-direction","animation-duration","animation-fill-mode","animation-iteration-count","animation-name","animation-play-state","animation-timing-function","appearance","aspect-ratio","backdrop-filter","backface-visibility","background","background-attachment","background-blend-mode","background-clip","background-color","background-image","background-origin","background-position","background-repeat","background-size","border","border-bottom","border-bottom-color","border-bottom-left-radius","border-bottom-right-radius","border-bottom-style","border-bottom-width","border-collapse","border-color","border-image","border-left","border-left-color","border-left-style","border-left-width","border-radius","border-right","border-right-color","border-right-style","border-right-width","border-spacing","border-style","border-top","border-top-color","border-top-left-radius","border-top-right-radius","border-top-style","border-top-width","border-width","bottom","box-decoration-break","box-shadow","box-sizing","caption-side","caret-color","clear","clip-path","color","column-count","column-fill","column-gap","column-rule","column-rule-color","column-rule-style","column-rule-width","column-span","column-width","columns","contain","content","counter-increment","counter-reset","cursor","direction","display","empty-cells","filter","flex","flex-basis","flex-direction","flex-flow","flex-grow","flex-shrink","flex-wrap","float","font","font-family","font-kerning","font-size","font-size-adjust","font-stretch","font-style","font-synthesis","font-variant","font-weight","gap","grid","grid-area","grid-auto-columns","grid-auto-flow","grid-auto-rows","grid-column","grid-column-end","grid-column-gap","grid-column-start","grid-gap","grid-row","grid-row-end","grid-row-gap","grid-row-start","grid-template","grid-template-areas","grid-template-columns","grid-template-rows","height","hyphens","image-rendering","inline-size","inset","isolation","justify-content","justify-items","justify-self","left","letter-spacing","line-break","line-height","list-style","list-style-image","list-style-position","list-style-type","margin","margin-bottom","margin-left","margin-right","margin-top","mask","mask-clip","mask-composite","mask-image","mask-mode","mask-origin","mask-position","mask-repeat","mask-size","max-height","max-width","min-height","min-width","mix-blend-mode","object-fit","object-position","opacity","order","orphans","outline","outline-color","outline-offset","outline-style","outline-width","overflow","overflow-wrap","overflow-x","overflow-y","padding","padding-bottom","padding-left","padding-right","padding-top","page-break-after","page-break-before","page-break-inside","perspective","perspective-origin","place-content","place-items","place-self","pointer-events","position","quotes","resize","right","rotate","row-gap","scale","scroll-behavior","scroll-margin","scroll-padding","scroll-snap-align","scroll-snap-type","scrollbar-color","scrollbar-width","shape-image-threshold","shape-margin","tab-size","table-layout","text-align","text-align-last","text-decoration","text-decoration-color","text-decoration-line","text-decoration-style","text-decoration-thickness","text-indent","text-justify","text-orientation","text-overflow","text-rendering","text-shadow","text-transform","text-underline-offset","top","touch-action","transform","transform-box","transform-origin","transform-style","transition","transition-delay","transition-duration","transition-property","transition-timing-function","translate","unicode-bidi","user-select","vertical-align","visibility","white-space","widows","width","will-change","word-break","word-spacing","word-wrap","writing-mode","z-index","@media","@keyframes","@import","@font-face","@supports",":hover",":active",":focus",":first-child",":last-child",":nth-child",":not","::before","::after","::placeholder","::selection","var(","calc(","clamp(","min(","max(","linear-gradient(","radial-gradient(","conic-gradient(","rgb(","rgba(","hsl(","hsla(","inherit","initial","unset","none","auto","normal","bold","italic","center","left","right","top","bottom","solid","dashed","dotted","double","hidden","visible","scroll","fixed","sticky","absolute","relative","static","flex","grid","block","inline","inline-block","inline-flex","nowrap","wrap","row","column","space-between","space-around","space-evenly","stretch","start","end","cover","contain","pointer","default","ease","ease-in","ease-out","ease-in-out","linear","forwards","both","infinite","alternate","border-box","content-box","!important"]};
 
-    <div class="header">
-        <div class="tabs-container" id="tabs-container"></div>
-        <button class="add-tab-btn" onclick="promptNewTab()" title="New File">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-        </button>
-        <div class="actions">
-            <button onclick="runCode()">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Build & Run
-            </button>
-            <button onclick="exportFiles()">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Export
-            </button>
-        </div>
-    </div>
+/* ═══ SMART HINT: HTML auto-tags + custom dicts ═══ */
+function smartHint(cm,options){
+  const tab=activeTab();
+  if(!tab)return null;
+  // For HTML mode, use CodeMirror's built-in html-hint which handles < tags natively
+  if(tab.lang==='htmlmixed'&&typeof CodeMirror.hint.html==='function'){
+    const result=CodeMirror.hint.html(cm,options);
+    if(result&&result.list&&result.list.length>0)return result;
+  }
+  // Fallback to our custom dictionary hint
+  return langHint(cm);
+}
 
-    <div class="utility-bar">
-        <label>
-            <input type="checkbox" id="live-toggle" onchange="toggleLiveMode(this.checked)"> Live Mode
-        </label>
-        <label>
-            <input type="checkbox" id="wrap-toggle" onchange="toggleWordWrap(this.checked)"> Word Wrap
-        </label>
-        <label>
-            Theme:
-            <select id="theme-select" onchange="toggleTheme(this.value)">
-                <option value="dark" selected>Dark</option>
-                <option value="light">Light</option>
-            </select>
-        </label>
-        <label>
-            Size:
-            <select id="font-size-select" onchange="changeFontSize(this.value)">
-                <option value="12px">12px</option>
-                <option value="14px" selected>14px</option>
-                <option value="16px">16px</option>
-                <option value="18px">18px</option>
-            </select>
-        </label>
-        <span id="save-status" style="margin-left: auto; font-style: italic; opacity: 0.7;">Ready</span>
-    </div>
+function langHint(cm){
+  const cur=cm.getCursor();const tok=cm.getTokenAt(cur);
+  const word=tok.string.replace(/^\s+/,'');if(word.length<1)return null;
+  const tab=activeTab();if(!tab)return null;
+  let dict=HINTS[tab.lang]||[];const lower=word.toLowerCase();
+  let m=dict.filter(h=>h.toLowerCase().startsWith(lower)&&h!==word);
+  if(!m.length)m=dict.filter(h=>h.toLowerCase().includes(lower)&&h!==word);
+  if(m.length>50)m=m.slice(0,50);
+  if(!m.length)return null;
+  return{list:m,from:CodeMirror.Pos(cur.line,tok.start),to:CodeMirror.Pos(cur.line,cur.ch)};
+}
 
-    <div class="workspace">
-        <div id="editor"></div>
-        <div class="output-panel">
-            <iframe id="preview"></iframe>
-            <div class="console-container">
-                <div class="console-header">
-                    <span>Live Output Log</span>
-                    <div class="console-clear-btn" onclick="clearConsole()">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                        Clear
-                    </div>
-                </div>
-                <div id="console-output"></div>
-            </div>
-        </div>
-    </div>
+let hintTimer=null;
+function autoHint(cm,change){
+  if(cm.state.completionActive)return;
+  const tok=cm.getTokenAt(cm.getCursor());
+  const ch=tok.string.trim();
+  // Trigger on < for HTML/XML tag completion
+  if(ch==='<'){
+    const tab=activeTab();
+    if(tab&&(tab.lang==='htmlmixed'||tab.lang==='xml')){cm.showHint({hint:smartHint,completeSingle:false});return}
+  }
+  // Trigger on regular typing
+  if(ch.length>=2&&/^[a-zA-Z_#@<:.]/.test(ch))cm.showHint({hint:smartHint,completeSingle:false});
+}
 
-    <script>
-        // Safe Storage Wrappers
-        function safeGetItem(key) {
-            try { return localStorage.getItem(key); } 
-            catch(e) { return null; }
-        }
-        function safeSetItem(key, val) {
-            try { localStorage.setItem(key, val); } 
-            catch(e) { /* Ignore - running in memory mode */ }
-        }
+const S={tabs:[],activeId:null,editor:null,dark:true,wrap:true,live:false,dragIdx:null,tabN:0,previewT:null,renameTarget:null,running:false,fontSize:13.5};
+const LANGS={python:{ext:'.py',ico:'fa-brands fa-python',cls:'python',label:'Python',ts:4},shell:{ext:'.sh',ico:'fa-solid fa-terminal',cls:'shell',label:'Shell',ts:4},qml:{ext:'.qml',ico:'fa-solid fa-cube',cls:'qml',label:'QML',ts:4},javascript:{ext:'.js',ico:'fa-brands fa-js',cls:'javascript',label:'JavaScript',ts:2},htmlmixed:{ext:'.html',ico:'fa-brands fa-html5',cls:'htmlmixed',label:'HTML',ts:2},css:{ext:'.css',ico:'fa-brands fa-css3-alt',cls:'css',label:'CSS',ts:2}};
+function uid(){return't'+(++S.tabN)+'_'+Date.now()}function getTab(id){return S.tabs.find(t=>t.id===id)}function activeTab(){return getTab(S.activeId)}
+function toast(msg,type='inf'){const c=document.getElementById('toasts'),t=document.createElement('div');t.className='toast '+type;const ic={ok:'fa-check-circle',err:'fa-circle-xmark',inf:'fa-circle-info',wrn:'fa-triangle-exclamation'};t.innerHTML=`<i class="fas ${ic[type]||ic.inf}"></i><span>${msg}</span>`;c.appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(100%)';t.style.transition='all .25s';setTimeout(()=>t.remove(),300)},3500)}
+function openModal(id){document.getElementById(id).classList.remove('hidden')}function closeModal(id){document.getElementById(id).classList.add('hidden')}
+function openNewFile(){openModal('new-modal');setTimeout(()=>{const i=document.getElementById('nf-name');i.value='';i.focus()},50)}
+function updateWelcome(){document.getElementById('welcome').classList.toggle('hidden',S.tabs.length>0)}
+function addTab(name,lang,content,focus=true){const id=uid();const info=LANGS[lang]||LANGS.python;const doc=CodeMirror.Doc(content||'',lang);const tab={id,name,lang,doc,dirty:false,info};S.tabs.push(tab);if(focus)switchTab(id);renderTabs();updateWelcome();return tab}
+function switchTab(id){const tab=getTab(id);if(!tab)return;S.activeId=id;if(S.editor){S.editor.swapDoc(tab.doc);S.editor.setOption('tabSize',tab.info.ts);S.editor.setOption('indentUnit',tab.info.ts);S.editor.refresh();S.editor.focus()}renderTabs();updateStatus();if(S.live)updatePreview()}
+function closeTab(id){const idx=S.tabs.findIndex(t=>t.id===id);if(idx<0)return;S.tabs.splice(idx,1);if(!S.tabs.length){S.activeId=null;if(S.editor)S.editor.swapDoc(CodeMirror.Doc('','text'));updateWelcome();renderTabs();updateStatus();if(S.live)updatePreview();return}if(S.activeId===id)switchTab(S.tabs[Math.min(idx,S.tabs.length-1)].id);else renderTabs();updateWelcome()}
+function renderTabs(){const c=document.getElementById('tabs-scroll');c.innerHTML='';S.tabs.forEach((tab,i)=>{const el=document.createElement('div');el.className='tab'+(tab.id===S.activeId?' active':'')+(tab.dirty?' dirty':'');el.draggable=true;el.dataset.idx=i;el.dataset.id=tab.id;el.innerHTML=`<i class="tab-ico ${tab.info.cls} ${tab.info.ico}"></i><span class="tab-nm">${tab.name}</span><span class="tab-dot"></span><span class="tab-x" data-xid="${tab.id}"><i class="fas fa-times"></i></span>`;el.addEventListener('click',e=>{if(e.target.closest('.tab-x')){closeTab(e.target.closest('.tab-x').dataset.xid);return}switchTab(tab.id)});el.addEventListener('dblclick',()=>{S.renameTarget=tab.id;document.getElementById('rn-name').value=tab.name;openModal('rename-modal')});el.addEventListener('contextmenu',e=>{e.preventDefault();switchTab(tab.id);showCtx(e.clientX,e.clientY,tab)});el.addEventListener('dragstart',e=>{S.dragIdx=i;el.classList.add('dragging');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',i)});el.addEventListener('dragend',()=>{el.classList.remove('dragging');document.querySelectorAll('.tab').forEach(t=>t.classList.remove('dov-l','dov-r'))});el.addEventListener('dragover',e=>{e.preventDefault();const r=el.getBoundingClientRect();el.classList.remove('dov-l','dov-r');el.classList.add(e.clientX<r.left+r.width/2?'dov-l':'dov-r')});el.addEventListener('dragleave',()=>el.classList.remove('dov-l','dov-r'));el.addEventListener('drop',e=>{e.preventDefault();el.classList.remove('dov-l','dov-r');const from=S.dragIdx;if(from==null||from===i)return;const r=el.getBoundingClientRect();const to=e.clientX<r.left+r.width/2?i:i+1;const[moved]=S.tabs.splice(from,1);S.tabs.splice(to-(from<to?1:0),0,moved);renderTabs()});c.appendChild(el)})}
+function showCtx(x,y,tab){const m=document.getElementById('ctx');m.innerHTML=`<div class="ctx-i" data-a="close"><i class="fas fa-times"></i>Close</div><div class="ctx-i" data-a="close-others"><i class="fas fa-times-circle"></i>Close Others</div><div class="ctx-i" data-a="close-all"><i class="fas fa-trash"></i>Close All</div><div class="ctx-s"></div><div class="ctx-i" data-a="duplicate"><i class="fas fa-copy"></i>Duplicate</div><div class="ctx-i" data-a="rename"><i class="fas fa-pen"></i>Rename</div>`;m.style.display='block';m.style.left=Math.min(x,innerWidth-180)+'px';m.style.top=Math.min(y,innerHeight-250)+'px';m.querySelectorAll('.ctx-i').forEach(it=>{it.addEventListener('click',()=>{const a=it.dataset.a;if(a==='close')closeTab(tab.id);else if(a==='close-others'){[...S.tabs].filter(t=>t.id!==tab.id).forEach(t=>closeTab(t.id))}else if(a==='close-all'){[...S.tabs].forEach(t=>closeTab(t.id))}else if(a==='duplicate')addTab(tab.name+' (copy)',tab.lang,tab.doc.getValue());else if(a==='rename'){S.renameTarget=tab.id;document.getElementById('rn-name').value=tab.name;openModal('rename-modal')}m.style.display='none'})})}
+document.addEventListener('click',()=>document.getElementById('ctx').style.display='none');
 
-        // Default Local File Template Architecture (Including QML)
-        const defaultFiles = [
-            { id: 'f1', name: 'main.qml', type: 'qml', content: 'import QtQuick 2.15\n\nRectangle {\n    width: 400\n    height: 400\n    color: "#222"\n\n    Text {\n        text: "QmlWeb Environment Online"\n        color: "#41cd52"\n        anchors.centerIn: parent\n        font.pixelSize: 20\n    }\n}' },
-            { id: 'f2', name: 'index.html', type: 'html', content: '<style>\n  body { font-family: sans-serif; color: #555; }\n</style>\n\n<p style="margin: 20px;">\n  Standard DOM is still accessible beneath the QML canvas layer.\n</p>' },
-            { id: 'f3', name: 'script.js', type: 'javascript', content: 'console.log("System components initialized.");' }
-        ];
+function initEditor(){
+  S.editor=CodeMirror(document.getElementById('editor-wrap'),{theme:'cf-dark',lineNumbers:true,lineWrapping:S.wrap,matchBrackets:true,autoCloseBrackets:true,autoCloseTags:true,foldGutter:true,gutters:["CodeMirror-linenumbers","CodeMirror-foldgutter"],styleActiveLine:true,indentUnit:4,tabSize:4,indentWithTabs:false,electricChars:true,viewportMargin:10,inputStyle:'contenteditable',
+    extraKeys:{"Ctrl-/":"toggleComment","Cmd-/":"toggleComment","Ctrl-Space":cm=>cm.showHint({hint:smartHint,completeSingle:false}),"Ctrl-S":()=>{doExport('file');return false},"Cmd-S":()=>{doExport('file');return false},"Ctrl-Enter":()=>{runCode();return false},"Cmd-Enter":()=>{runCode();return false},"Ctrl-B":()=>{toggleLive();return false},"Cmd-B":()=>{toggleLive();return false},"Ctrl-Shift-P":()=>{openCmdPal();return false},"Cmd-Shift-P":()=>{openCmdPal();return false},"Ctrl-N":()=>{openNewFile();return false},"Cmd-N":()=>{openNewFile();return false},"Ctrl-W":()=>{if(S.activeId)closeTab(S.activeId);return false},"</":cm=>{const cur=cm.getCursor();cm.replaceRange('/>',cur);cm.setCursor(cur.line,cur.ch+2);return null},">":cm=>{const cur=cm.getCursor();cm.replaceRange('>',cur);cm.setCursor(cur.line,cur.ch+1);return null}}
+  });
+  // more aggressive autocomplete trigger: on change and inputRead (helps when typing .,>,( etc.)
+  S.editor.on('change',(cm,change)=>{const tab=activeTab();if(tab&&!tab.dirty){tab.dirty=true;renderTabs()}if(S.live)debouncePreview();updateStatus();autoHint(cm,change)});
+  S.editor.on('inputRead',(cm,change)=>{try{
+    const ch = (change?.text && change.text.join('')) || '';
+    // trigger on punctuation or short tokens
+    if(/[\.>\(\)\:]/.test(ch) || /^\w{1,3}$/.test(ch)) autoHint(cm,change);
+  }catch(e){}});
+  S.editor.on('cursorActivity',updateStatus);
+  S.editor.swapDoc(CodeMirror.Doc('','text'));
+}
+function updateStatus(){const cm=S.editor;if(!cm)return;const cur=cm.getCursor();document.getElementById('st-cur').textContent=`Ln ${cur.line+1}, Col ${cur.ch+1}`;const tab=activeTab();if(tab){document.getElementById('st-lang').textContent=tab.info.label;document.getElementById('st-ind').textContent='Spaces: '+tab.info.ts}else{document.getElementById('st-lang').textContent='--';document.getElementById('st-ind').textContent='Spaces: 4'}document.getElementById('st-wrap').textContent='Wrap: '+(S.wrap?'On':'Off')}
 
-        // Persistence State Initialization
-        let parsedFiles = null;
-        let storedData = safeGetItem('ide_files');
-        if (storedData) {
-            try { parsedFiles = JSON.parse(storedData); } catch (e) {}
-        }
+function fontBigger(){S.fontSize=Math.min(24,S.fontSize+1);document.documentElement.style.setProperty('--font-size',S.fontSize+'px');S.editor&&S.editor.refresh();toast('Font: '+S.fontSize+'px','inf')}
+function fontSmaller(){S.fontSize=Math.max(8,S.fontSize-1);document.documentElement.style.setProperty('--font-size',S.fontSize+'px');S.editor&&S.editor.refresh();toast('Font: '+S.fontSize+'px','inf')}
+function clearAllOutput(){setOutput('');hideOutput();toast('Cleared','inf')}
+function toggleMobileOutput(){const p=document.getElementById('output-pane');if(p.classList.contains('open'))hideOutput();else showOutput()}
+function openSheet(){document.getElementById('mob-sheet').classList.add('open');document.getElementById('mob-overlay').classList.add('open')}
+function closeSheet(){document.getElementById('mob-sheet').classList.remove('open');document.getElementById('mob-overlay').classList.remove('open')}
+function toggleSheet(){if(document.getElementById('mob-sheet').classList.contains('open'))closeSheet();else openSheet()}
+document.getElementById('mob-overlay').addEventListener('click',closeSheet);
 
-        let files = parsedFiles || defaultFiles;
-        let activeFileId = safeGetItem('ide_active_file') || 'f1';
-        let editorInstance = null;
-        let isAceActive = false;
-        let isLiveMode = false;
-        let buildDebounce = null;
+const MAX_OUTPUT=50000;
+function runCode(){const tab=activeTab();if(!tab){toast('No file','wrn');return}S.running=true;document.getElementById('btn-run').style.display='none';document.getElementById('btn-stop').classList.add('vis');showOutput();setOutput('Running '+tab.name+'...\n\n');if(tab.lang==='python')runPython(tab.doc.getValue());else if(tab.lang==='shell')runShell(tab.doc.getValue());else if(tab.lang==='javascript')runJS(tab.doc.getValue());else if(tab.lang==='htmlmixed'||tab.lang==='qml'||tab.lang==='css'){if(!S.live)toggleLive();updatePreview();setOutput('Preview opened.\n');stopRun()}else{setOutput('Not supported.',true);stopRun()}}
+function stopRun(){S.running=false;document.getElementById('btn-run').style.display='';document.getElementById('btn-stop').classList.remove('vis')}
+function stopExec(){setOutput('Stopped.\n');stopRun();toast('Stopped','wrn')}
+function runPython(code){if(typeof Sk==='undefined'){setOutput('Skulpt not loaded.',true);stopRun();return}let out='',capped=false;Sk.configure({output:t=>{if(capped)return;if(out.length<MAX_OUTPUT)out+=t;else{out+='\n\n... [Output truncated] ...\n';capped=true;stopExec()}},read:x=>{if(Sk.builtinFiles===undefined||Sk.builtinFiles["files"][x]===undefined)throw"File not found: '"+x+"'";return Sk.builtinFiles["files"][x]}});Sk.misceval.asyncToPromise(()=>Sk.importMainWithBody("<stdin>",false,code,true)).then(()=>{setOutput(out||'Done (exit 0)');toast('Python OK','ok');stopRun()},err=>{setOutput(out+'\n'+err.toString(),true);toast('Python error','err');stopRun()})}
+function runShell(code){let out='';const lines=code.split('\n');const V={};for(let raw of lines){let l=raw.trim();if(!l||l.startsWith('#'))continue;Object.entries(V).forEach(([k,v])=>l=l.replace(new RegExp('\\$\\{?'+k+'\\}?','g'),v));l=l.replace(/\$\(([^)]+)\)/g,(_,c)=>{if(c.startsWith('date'))return new Date().toString();if(c.startsWith('whoami'))return'user';if(c.startsWith('pwd'))return'/home/user';return''});const am=l.match(/^([A-Za-z_]\w*)=(.*)$/);if(am&&l.indexOf('=')===l.search(/=/)){V[am[1]]=am[2].replace(/^["']|["']$/g,'');continue}if(l.startsWith('echo ')){let m=l.slice(5).replace(/^["']|["']$/g,'');Object.entries(V).forEach(([k,v])=>m=m.replace(new RegExp('\\$\\{?'+k+'\\}?','g'),v));out+=m+'\n';continue}const mm=l.match(/\$\(\(([^)]+)\)\)/);if(mm){try{out+=String(eval(mm[1]))+'\n'}catch(e){out+='Error\n'}continue}if(l==='date')out+=new Date().toString()+'\n';else if(l==='whoami')out+='user\n';else if(l==='pwd')out+='/home/user\n';else if(l==='ls')out+='file1.txt  file2.sh\n';else if(l.startsWith('for ')||l.startsWith('if ')||l==='do'||l==='done'||l==='then'||l==='fi'||l==='else'||l==='elif'||l.startsWith('while '))continue;else out+=l+'\n';if(out.length>MAX_OUTPUT){out+='\n\n... [Output truncated] ...\n';break}}setOutput(out||'Done.');toast('Shell OK','ok');stopRun()}
+function runJS(code){let out='',capped=false;const ol=console.log,oe=console.error,ow=console.warn;const addO=(p,args)=>{if(capped)return;const s=args.map(x=>typeof x==='object'?JSON.stringify(x,null,2):String(x)).join(' ')+'\n';if(out.length+s.length<MAX_OUTPUT)out+=p+s;else{out+='\n... [Output truncated] ...\n';capped=true}};console.log=(...a)=>addO('',a);console.error=(...a)=>addO('[ERR] ',a);console.warn=(...a)=>addO('[WARN] ',a);try{const r=eval(code);if(r!==undefined&&out==='')out+=String(r)+'\n';setOutput(out||'Done.');toast('JS OK','ok')}catch(e){setOutput(out+e.message,true);toast('JS error','err')}console.log=ol;console.error=oe;console.warn=ow;stopRun()}
 
-        // Vector Asset Compiler Map
-        const icons = {
-            html: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e34c26" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>',
-            css: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#264de4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>',
-            js: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f0db4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M8 13h4M8 17h4"></path></svg>',
-            qml: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#41cd52" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>',
-            generic: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#969696" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>',
-            close: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>'
+function toggleLive(){S.live=!S.live;const pp=document.getElementById('preview-pane'),rh=document.getElementById('resize-h'),btn=document.getElementById('btn-live');btn.classList.toggle('active',S.live);if(S.live){pp.classList.add('open');rh.style.display='block';updatePreview();initResize()}else{pp.classList.remove('open');rh.style.display='none'}setTimeout(()=>S.editor&&S.editor.refresh(),50)}
+function debouncePreview(){clearTimeout(S.previewT);S.previewT=setTimeout(updatePreview,300)}
+function updatePreview(){const tab=activeTab();const body=document.getElementById('preview-body');const bg=S.dark?'#1e1e2e':'#f8f9fa';document.getElementById('preview-title').innerHTML=`<i class="fas fa-eye" style="margin-right:6px"></i>Preview${tab?' — '+tab.name:''}`;if(!tab){body.style.background=bg;body.innerHTML=`<div style="padding:32px;text-align:center;color:#6e7681">Create a file to preview</div>`;return}const code=tab.doc.getValue();try{if(tab.lang==='htmlmixed')previewHTML(body,code,bg);else if(tab.lang==='qml')previewQML(body,code,bg);else if(tab.lang==='css')previewCSS(body,code,bg);else if(tab.lang==='javascript')previewJS(body,code,bg);else{body.style.background=bg;body.innerHTML=`<div style="padding:32px;text-align:center;color:${S.dark?'#6e7681':'#656d76'}">Live preview for HTML, QML, CSS, JS</div>`}}catch(e){body.style.background=bg;body.innerHTML=`<div style="padding:20px;color:var(--red);font-size:12px">Error: ${esc(e.message)}</div>`}}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function previewHTML(body,code){body.style.background='#fff';body.innerHTML='';const ifr=document.createElement('iframe');ifr.style.cssText='width:100%;height:100%;border:none;background:#fff';ifr.sandbox='allow-scripts allow-same-origin';body.appendChild(ifr);setTimeout(()=>{try{const d=ifr.contentDocument||ifr.contentWindow.document;d.open();d.write(code);d.close()}catch(e){try{ifr.srcdoc=code}catch(e2){body.innerHTML='<div style="padding:20px;color:red">Error</div>'}}},50)}
+function previewCSS(body,code){body.style.background='#fff';body.innerHTML=`<div style="padding:20px;font-family:system-ui,sans-serif"><h2 style="margin:0 0 4px;font-size:20px;color:#1a1a2e">CSS Preview</h2><style>${code}</style><div style="padding:16px;border:1px solid #ddd;border-radius:8px;background:#fff"><h1>Heading 1</h1><h2>Heading 2</h2><p>Paragraph with <strong>bold</strong>, <em>italic</em>, <a href="#">link</a>.</p><button class="btn" style="margin:4px">Button</button><input type="text" placeholder="Input" style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;width:200px"></div></div>`}
+function previewJS(body,code){const bg=S.dark?'#1e1e2e':'#f8f9fa';body.style.background=bg;let out='';const ol=console.log;console.log=(...a)=>{out+=a.map(x=>typeof x==='object'?JSON.stringify(x,null,2):String(x)).join(' ')+'\n'};try{const r=eval(code);if(r!==undefined&&out==='')out=String(r)}catch(e){out='Error: '+e.message}console.log=ol;body.innerHTML=`<div style="padding:16px;font-family:var(--font-mono);font-size:13px;color:${S.dark?'#c9d1d9':'#333'};white-space:pre-wrap;background:${bg};min-height:100%"><div style="color:${S.dark?'#6e7681':'#999'};font-size:11px;margin-bottom:8px;border-bottom:1px solid ${S.dark?'#30363d':'#d0d7de'};padding-bottom:6px">&gt; Output</div>${esc(out)||'<span style="color:#6e7681">(no output)</span>'}</div>`}
+function previewQML(body,code){const bg=S.dark?'#1e1e2e':'#f8f9fa';body.style.background=bg;if(!code.trim()){body.innerHTML=`<div style="padding:24px;text-align:center;color:#6e7681">Write QML code to preview</div>`;return}try{const tree=parseQML(code);if(!tree){body.innerHTML=`<div style="padding:24px;text-align:center;color:#6e7681">No renderable QML objects</div>`;return}body.innerHTML=renderQMLNode(tree,bg)}catch(e){body.innerHTML=`<div style="padding:20px;color:var(--red);font-size:12px"><strong>QML Error:</strong><br>${esc(e.message)}</div>`}}
+function parseQML(code){code=code.replace(/\/\/.*$/gm,'').replace(/\/\*[\s\S]*?\*\//g,'').replace(/^import\s+[^;]+;?\s*$/gm,'').trim();if(!code)return null;const m=code.match(/\b([A-Z][A-Za-z0-9]*)\s*\{/);if(!m)return null;return parseQMLObject(code,m.index)}
+function parseQMLObject(code,si){const nm=code.substring(si).match(/^([A-Z][A-Za-z0-9]*)\s*\{/);if(!nm)return null;let i=si+nm[0].length-1;const be=findBrace(code,i);const bc=code.substring(i+1,be);const{props,children}=parseQMLBlock(bc);return{type:nm[1],props,children}}
+function findBrace(code,oi){let d=0,i=oi;while(i<code.length){const c=code[i];if(c==='{')d++;else if(c==='}'){d--;if(d===0)return i}else if(c==='"'||c==="'"){const q=c;i++;while(i<code.length&&code[i]!==q){if(code[i]==='\\')i++;i++}}i++}return code.length-1}
+function parseQMLBlock(content){const props={},children=[];let i=0;while(i<content.length){while(i<content.length&&/\s/.test(content[i]))i++;if(i>=content.length)break;if(/[A-Z]/.test(content[i])){const nm=content.substring(i).match(/^([A-Z][A-Za-z0-9]*)\s*\{/);if(nm){const child=parseQMLObject(content,i);if(child){children.push(child);const eStart=i+nm[0].length-1;const eEnd=findBrace(content,eStart);i=eEnd+1;continue}}}const pm=content.substring(i).match(/^([a-zA-Z_][a-zA-Z0-9_.]*)\s*:/);if(pm){const pn=pm[1];i+=pm[0].length;while(i<content.length&&/\s/.test(content[i]))i++;const vr=parseQMLValue(content,i,pn);if(vr){if(vr.type==='object')children.push({type:pn,...vr.value});else if(vr.type!=='skip')props[pn]=vr.value;i=vr.end;continue}}i++}return{props,children}}
+function parseQMLValue(content,start,propName){let i=start;while(i<content.length&&/\s/.test(content[i]))i++;if(i>=content.length)return null;if(content[i]==='{'){const end=findBrace(content,i);if(propName&&propName.startsWith('on'))return{type:'skip',value:null,end:end+1};const bc=content.substring(i+1,end);const{props,children}=parseQMLBlock(bc);return{type:'object',value:{props,children},end:end+1}}if(content[i]==='"'||content[i]==="'"){const q=content[i];let s='';i++;while(i<content.length&&content[i]!==q){if(content[i]==='\\'){s+=content[i++];if(i<content.length)s+=content[i++]}else s+=content[i++]}if(i<content.length)i++;while(i<content.length&&content[i]!==';'&&content[i]!=='\n')i++;if(i<content.length&&content[i]===';')i++;return{type:'string',value:s,end:i}}let val='',depth=0;while(i<content.length){if(content[i]==='{')depth++;else if(content[i]==='}'){if(depth===0)break;depth--}else if((content[i]===';'||content[i]==='\n')&&depth===0)break;val+=content[i];i++}if(i<content.length&&content[i]===';')i++;val=val.trim();if(!val)return null;return{type:'primitive',value:val,end:i}}
+function renderQMLNode(node,bg){if(!node)return'';const sty=buildQMLStyle(node);const ch=(node.children||[]).map(c=>renderQMLNode(c,bg)).join('');const ss=Object.entries(sty).map(([k,v])=>`${k.replace(/[A-Z]/g,m=>'-'+m.toLowerCase())}:${v}`).join(';');const tag=node.type,p=node.props||{};if(tag==='Gradient'||tag==='GradientStop')return'';if(tag==='Text'){const t=String(p.text||'');const fs=parseInt(p['font.pixelSize'])||14;const b=p['font.bold']==='true'?'font-weight:700;':'';const c=p.color||'#fff';const al=p['anchors.horizontalCenter']==='parent.horizontalCenter'?'text-align:center;width:100%;':'';return`<div style="font-size:${fs}px;${b}color:${c};${al};display:flex;align-items:center">${t}</div>`}if(tag==='Button'){const t=String(p.text||'Button');const bg2=p.color||'#e94560';return`<button style="padding:8px 20px;border:none;border-radius:6px;background:${bg2};color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:system-ui">${t}</button>`}if(tag==='TextField')return`<input type="text" placeholder="${esc(p.placeholderText||p.text||'')}" style="padding:8px 12px;border:1px solid #555;border-radius:4px;background:#2a2a3a;color:#fff;font-size:14px;width:200px">`;if(tag==='Switch')return`<label style="display:flex;align-items:center;gap:8px;color:#ccc"><input type="checkbox"><span>Switch</span></label>`;if(tag==='CheckBox')return`<label style="display:flex;align-items:center;gap:8px;color:#ccc"><input type="checkbox"><span>${p.text||'Checkbox'}</span></label>`;if(tag==='Slider')return`<input type="range" style="width:200px">`;if(tag==='ProgressBar'){const v=p.value||0.5;return`<div style="width:200px;height:6px;background:#333;border-radius:3px;overflow:hidden"><div style="width:${v*100}%;height:100%;background:#e94560;border-radius:3px"></div></div>`}if(tag==='Column')return`<div style="${ss};display:flex;flex-direction:column;align-items:center;gap:${p.spacing||8}px">${ch}</div>`;if(tag==='Row')return`<div style="${ss};display:flex;flex-direction:row;align-items:center;gap:${p.spacing||8}px">${ch}</div>`;if(tag==='ApplicationWindow'||tag==='Window'){const w=p.width||400;const h=p.height||600;return`<div style="width:${w}px;max-width:100%;height:${h}px;${ss};overflow:hidden;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.3);margin:0 auto">${ch}</div>`}if(tag==='Timer'||tag==='MouseArea')return'';if(tag==='Flickable')return`<div style="${ss};overflow:auto">${ch}</div>`;if(tag==='Item')return`<div style="${ss};position:relative">${ch}</div>`;return`<div style="${ss}">${ch}</div>`}
+function buildQMLStyle(n){const s={},p=n.props||{};if(p.width)s.width=p.width+'px';if(p.height)s.height=p.height+'px';if(p.color)s.backgroundColor=p.color;if(p.radius)s.borderRadius=p.radius+'px';if(p['border.width']){s.borderWidth=p['border.width']+'px';s.borderStyle='solid'}if(p['border.color'])s.borderColor=p['border.color'];if(p['anchors.fill']==='parent'){s.width='100%';s.height='100%'}if(p['anchors.centerIn']==='parent'){s.position='absolute';s.top='50%';s.left='50%';s.transform='translate(-50%,-50%)'}if(p['anchors.horizontalCenter']==='parent.horizontalCenter'){s.marginLeft='auto';s.marginRight='auto'}if(p['anchors.margins'])s.margin=p['anchors.margins']+'px';if(p.clip==='true')s.overflow='hidden';if(p.opacity)s.opacity=p.opacity;if(p.rotation)s.transform=`rotate(${p.rotation}deg)`;if(p.scale)s.transform=(s.transform?s.transform+' ':'')+`scale(${p.scale})`;const gc=(n.children||[]).filter(c=>c.type==='Gradient');if(gc.length){const stops=(gc[0].children||[]).filter(c=>c.type==='GradientStop');const cols=stops.map(s=>`${s.props?.color||'#000'} ${(parseFloat(s.props?.position||0))*100}%`).join(',');if(cols){s.background=`linear-gradient(180deg,${cols})`;delete s.backgroundColor}}return s}
+
+function prettyPrint(){const tab=activeTab();if(!tab)return;const code=tab.doc.getValue();let fmt;try{if(tab.lang==='javascript'&&typeof js_beautify!=='undefined')fmt=js_beautify(code,{indent_size:2,max_preserve_newlines:2});else if(tab.lang==='htmlmixed'&&typeof html_beautify!=='undefined')fmt=html_beautify(code,{indent_size:2,max_preserve_newlines:2});else if(tab.lang==='css'&&typeof css_beautify!=='undefined')fmt=css_beautify(code,{indent_size:2});else if(tab.lang==='qml'&&typeof js_beautify!=='undefined')fmt=js_beautify(code,{indent_size:4,max_preserve_newlines:2});else if(tab.lang==='python')fmt=code.split('\n').map(l=>{const t=l.trimEnd();if(!t)return'';const i=t.search(/\S/);return' '.repeat(Math.floor(i/4)*4)+t.trimStart()}).join('\n').replace(/\n{3,}/g,'\n\n');else if(tab.lang==='shell')fmt=code.split('\n').reduce((a,l)=>{if(!l.trim()&&a.length&&a[a.length-1]==='')return a;a.push(l.trimEnd());return a},[]).join('\n');else{toast('Not supported','wrn');return}tab.doc.setValue(fmt);toast('Formatted','ok')}catch(e){toast('Error','err')}}
+function toggleWrap(){S.wrap=!S.wrap;S.editor.setOption('lineWrapping',S.wrap);document.getElementById('btn-wrap').classList.toggle('active',S.wrap);updateStatus()}
+function toggleTheme(){S.dark=!S.dark;document.body.classList.toggle('light',!S.dark);S.editor.setOption('theme',S.dark?'cf-dark':'cf-light');document.getElementById('btn-theme').innerHTML=S.dark?'<i class="fas fa-moon"></i>':'<i class="fas fa-sun"></i>';if(S.live)updatePreview()}
+function foldAll(){S.editor&&S.editor.execCommand('foldAll')}function unfoldAll(){S.editor&&S.editor.execCommand('unfoldAll')}
+function doFind(){S.editor&&S.editor.execCommand('find')}function doReplace(){S.editor&&S.editor.execCommand('replace')}
+function doGoto(){S.editor&&S.editor.execCommand('jumpToLine')}function doComment(){S.editor&&S.editor.execCommand('toggleComment')}
+function doUndo(){S.editor&&S.editor.undo()}function doRedo(){S.editor&&S.editor.redo()}
+function showOutput(){document.getElementById('output-pane').classList.add('open');setTimeout(()=>S.editor&&S.editor.refresh(),250)}
+function hideOutput(){document.getElementById('output-pane').classList.remove('open');setTimeout(()=>S.editor&&S.editor.refresh(),50)}
+function setOutput(t,err=false){const el=document.getElementById('output-body');el.textContent=t;el.style.color=err?'var(--red)':'var(--text2)';el.scrollTop=el.scrollHeight}
+function createFile(){let n=document.getElementById('nf-name').value.trim();const lang=document.getElementById('nf-lang').value;const info=LANGS[lang]||LANGS.python;if(!n)n='untitled'+info.ext;if(!n.includes('.'))n+=info.ext;addTab(n,lang,'');closeModal('new-modal');toast('Created '+n,'ok')}
+function doRename(){const tab=getTab(S.renameTarget);if(!tab)return;let n=document.getElementById('rn-name').value.trim();if(!n)return;tab.name=n;const ext=n.split('.').pop().toLowerCase();const em={py:'python',sh:'shell',qml:'qml',js:'javascript',html:'htmlmixed',css:'css'};if(em[ext]&&em[ext]!==tab.lang){tab.lang=em[ext];tab.info=LANGS[tab.lang];const doc=CodeMirror.Doc(tab.doc.getValue(),tab.lang);tab.doc=doc;if(S.activeId===tab.id)S.editor.swapDoc(doc)}renderTabs();closeModal('rename-modal');toast('Renamed','ok')}
+function doExport(mode){const tab=activeTab();if(!tab){toast('No file','wrn');return}if(mode==='file'){const blob=new Blob([tab.doc.getValue()],{type:'text/plain;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=tab.name;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href);tab.dirty=false;renderTabs();toast('Downloaded '+a.download,'ok');closeModal('export-modal')}else{navigator.clipboard.writeText(tab.doc.getValue()).then(()=>{toast('Copied','ok');closeModal('export-modal')}).catch(()=>toast('Clipboard denied','err'))}}
+function initResize(){const h=document.getElementById('resize-h'),main=document.getElementById('editor-area'),pp=document.getElementById('preview-pane');let sx,sw;function mv(e){const cx=e.clientX||e.touches?.[0]?.clientX||0;pp.style.width=Math.max(180,Math.min(main.offsetWidth-180,sw-(cx-sx)))+'px'}function up(){h.classList.remove('active');document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);document.removeEventListener('touchmove',mv);document.removeEventListener('touchend',up)}h.onmousedown=e=>{e.preventDefault();sx=e.clientX;sw=pp.offsetWidth;h.classList.add('active');document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up)};h.ontouchstart=e=>{sx=e.touches[0].clientX;sw=pp.offsetWidth;h.classList.add('active');document.addEventListener('touchmove',mv,{passive:false});document.addEventListener('touchend',up)}}
+
+/* ═══ PREVIEW DOWNLOAD BUTTON ═══ */
+function downloadFromPreview(){
+  const tab = activeTab();
+  if(!tab){ toast('No file','wrn'); return }
+  // If previewing HTML, try to grab iframe's serialized content and download that
+  if(tab.lang === 'htmlmixed'){
+    const body = document.getElementById('preview-body');
+    const ifr = body.querySelector('iframe');
+    if(ifr){
+      try{
+        // attempt to read iframe document
+        const d = ifr.contentDocument || ifr.contentWindow.document;
+        const html = '<!doctype html>\n' + d.documentElement.outerHTML;
+        const blob = new Blob([html], {type: 'text/html;charset=utf-8'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = tab.name || 'preview.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+        toast('Downloaded preview','ok');
+        return;
+      }catch(e){
+        // fallback to exporting the source code
+      }
+    }
+  }
+  doExport('file');
+}
+
+// Simple file import: open file picker, read content and create a tab
+function openFileImport(){
+  const inp = document.getElementById('file-import');
+  inp.value = '';
+  inp.click();
+}
+document.getElementById('file-import').addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0];
+  if(!f) return;
+  const txt = await f.text().catch(()=>null);
+  const name = f.name || ('uploaded_' + Date.now());
+  if(txt===null){toast('Unable to read file','err');return}
+  // choose language by extension
+  const ext = (name.split('.').pop()||'').toLowerCase();
+  const map = {py:'python',sh:'shell',qml:'qml',js:'javascript',html:'htmlmixed',css:'css'};
+  const lang = map[ext] || 'javascript';
+  addTab(name, lang, txt, true);
+  toast('Imported '+name,'ok');
+});
+
+const CMDS=[{n:'Run Code',i:'fa-play',k:'Ctrl+Enter',f:runCode},{n:'Stop',i:'fa-stop',k:'',f:stopExec},{n:'Live Preview',i:'fa-eye',k:'Ctrl+B',f:toggleLive},{n:'Pretty Print',i:'fa-wand-magic-sparkles',k:'Ctrl+Shift+F',f:prettyPrint},{n:'Word Wrap',i:'fa-text-width',k:'',f:toggleWrap},{n:'Toggle Theme',i:'fa-circle-half-stroke',k:'',f:toggleTheme},{n:'Undo',i:'fa-rotate-left',k:'Ctrl+Z',f:doUndo},{n:'Redo',i:'fa-rotate-right',k:'Ctrl+Y',f:doRedo},{n:'Find',i:'fa-search',k:'Ctrl+F',f:doFind},{n:'Replace',i:'fa-exchange-alt',k:'Ctrl+H',f:doReplace},{n:'Go to Line',i:'fa-arrow-right',k:'Ctrl+G',f:doGoto},{n:'Toggle Comment',i:'fa-code',k:'Ctrl+/',f:doComment},{n:'Fold All',i:'fa-compress-alt',k:'',f:foldAll},{n:'Unfold All',i:'fa-expand-alt',k:'',f:unfoldAll},{n:'Font Bigger',i:'fa-magnifying-glass-plus',k:'',f:fontBigger},{n:'Font Smaller',i:'fa-magnifying-glass-minus',k:'',f:fontSmaller},{n:'Clear Output',i:'fa-broom',k:'',f:clearAllOutput},{n:'Export',i:'fa-download',k:'Ctrl+S',f:()=>doExport('file')},{n:'Copy All',i:'fa-clipboard',k:'',f:()=>doExport('clipboard')},{n:'New File',i:'fa-file-circle-plus',k:'Ctrl+N',f:openNewFile},{n:'Close Tab',i:'fa-times',k:'Ctrl+W',f:()=>{if(S.activeId)closeTab(S.activeId)}}];
+let cmdSel=0;
+function openCmdPal(){openModal('cmd-pal');document.getElementById('cmd-input').value='';document.getElementById('cmd-input').focus();cmdSel=0;renderCmds('')}
+function closeCmdPal(){closeModal('cmd-pal')}
+function renderCmds(q){const list=document.getElementById('cmd-list');list.innerHTML='';const fl=CMDS.filter(c=>c.n.toLowerCase().includes(q.toLowerCase()));cmdSel=Math.max(0,Math.min(cmdSel,fl.length-1));fl.forEach((c,i)=>{const li=document.createElement('li');li.className=i===cmdSel?'sel':'';li.innerHTML=`<i class="fas ${c.i}"></i>${c.n}${c.k?`<span class="sc">${c.k}</span>`:''}`;li.onclick=()=>{closeCmdPal();c.f()};li.onmouseenter=()=>{cmdSel=i;renderCmds(document.getElementById('cmd-input').value)};list.appendChild(li)})}
+document.getElementById('cmd-input').addEventListener('input',e=>{cmdSel=0;renderCmds(e.target.value)});
+document.getElementById('cmd-input').addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();cmdSel++;renderCmds(e.target.value)}else if(e.key==='ArrowUp'){e.preventDefault();cmdSel--;renderCmds(e.target.value)}else if(e.key==='Enter'){e.preventDefault();const fl=CMDS.filter(c=>c.n.toLowerCase().includes(e.target.value.toLowerCase()));if(fl[cmdSel]){closeCmdPal();fl[cmdSel].f()}}else if(e.key==='Escape')closeCmdPal()});
+document.getElementById('cmd-pal').addEventListener('click',e=>{if(e.target.id==='cmd-pal')closeCmdPal()});
+document.querySelectorAll('.act-btn[data-p]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    // visual active state
+    document.querySelectorAll('.act-btn[data-p]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    // show corresponding side panel content
+    const p = btn.dataset.p;
+    showSidePanel(p);
+  });
+});
+
+// Side panel behavior & renderers
+const side = document.getElementById('side-pane');
+const sideBody = document.getElementById('side-body');
+const sideTitle = document.getElementById('side-title');
+document.getElementById('side-close').addEventListener('click',()=>{closeSide()});
+
+function showSidePanel(name){
+  side.classList.remove('side-hidden');
+  side.setAttribute('aria-hidden','false');
+  side.style.display='flex';
+  sideTitle.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+  renderSideContent(name);
+  // ensure editor refresh to avoid layout glitches
+  setTimeout(()=>S.editor&&S.editor.refresh(),120);
+}
+
+function closeSide(){
+  side.classList.add('side-hidden');
+  side.setAttribute('aria-hidden','true');
+  side.style.display='none';
+  // remove active from buttons
+  document.querySelectorAll('.act-btn[data-p]').forEach(b=>b.classList.remove('active'));
+}
+
+// Renderers for each panel
+function renderSideContent(name){
+  sideBody.innerHTML = '';
+  if(name === 'explorer'){
+    const wrap = document.createElement('div');
+    wrap.style.padding = '12px';
+    wrap.innerHTML = `<div style="margin-bottom:8px;font-size:13px;color:var(--muted)">Files</div>`;
+    const list = document.createElement('div');
+    list.style.display = 'flex';
+    list.style.flexDirection = 'column';
+    list.style.gap = '6px';
+    S.tabs.forEach(t=>{
+      const it = document.createElement('button');
+      it.className = 'wa-btn';
+      it.style.justifyContent = 'space-between';
+      it.style.padding = '8px 10px';
+      it.style.fontSize = '13px';
+      it.textContent = t.name;
+      it.onclick = ()=>{switchTab(t.id);closeSide()};
+      list.appendChild(it);
+    });
+    if(S.tabs.length===0) list.innerHTML = `<div style="color:var(--muted);font-size:13px">No files</div>`;
+    wrap.appendChild(list);
+    const act = document.createElement('div');
+    act.style.display='flex';act.style.gap='8px';act.style.marginTop='12px';
+    const nbtn = document.createElement('button'); nbtn.className='wa-btn primary'; nbtn.textContent='New'; nbtn.onclick=()=>{openNewFile()};
+    const imp = document.createElement('button'); imp.className='wa-btn'; imp.textContent='Import'; imp.onclick=()=>{openFileImport()};
+    act.appendChild(nbtn); act.appendChild(imp);
+    wrap.appendChild(act);
+    sideBody.appendChild(wrap);
+  } else if(name === 'search'){
+    const wrap = document.createElement('div');
+    wrap.style.padding='12px';
+    wrap.innerHTML = `<input id="side-search-input" placeholder="Search all files..." style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg0);color:var(--text);margin-bottom:8px">`;
+    const res = document.createElement('div'); res.id='side-search-results'; res.style.maxHeight='40vh'; res.style.overflow='auto';
+    wrap.appendChild(res);
+    sideBody.appendChild(wrap);
+    const inp = document.getElementById('side-search-input');
+    inp.addEventListener('input',()=>{ renderSearchResults(inp.value) });
+    inp.focus();
+  } else if(name === 'git'){
+    sideBody.innerHTML = `<div style="padding:12px;color:var(--muted)"><div style="font-weight:700;margin-bottom:8px">Source Control</div><div>Branch: <strong>main</strong></div><div style="margin-top:8px;color:var(--muted)">No changes</div></div>`;
+  } else if(name === 'ext'){
+    sideBody.innerHTML = `<div style="padding:12px;color:var(--muted)"><div style="font-weight:700;margin-bottom:8px">Extensions</div><div style="color:var(--muted)">No extensions installed</div></div>`;
+  } else {
+    sideBody.innerHTML = `<div style="padding:12px;color:var(--muted)">Empty</div>`;
+  }
+}
+
+function renderSearchResults(q){
+  const out = document.getElementById('side-search-results');
+  out.innerHTML='';
+  if(!q || q.trim().length<2){ out.innerHTML = `<div style="color:var(--muted);padding:8px">Type 2+ characters to search</div>`; return }
+  const lower = q.toLowerCase();
+  let found = 0;
+  S.tabs.forEach(t=>{
+    const v = t.doc.getValue();
+    const lines = v.split('\n');
+    lines.forEach((ln,i)=>{
+      if(ln.toLowerCase().includes(lower)){
+        found++;
+        const el = document.createElement('div');
+        el.style.padding='8px';
+        el.style.borderBottom='1px solid var(--border)';
+        el.style.cursor='pointer';
+        el.innerHTML = `<div style="font-size:13px;color:var(--text2)">${esc(ln.trim())}</div><div style="font-size:11px;color:var(--muted)">${t.name} — line ${i+1}</div>`;
+        el.onclick = ()=>{
+          switchTab(t.id);
+          S.editor.setCursor({line:i,ch:0});
+          S.editor.focus();
+          closeSide();
         };
+        out.appendChild(el);
+      }
+    });
+  });
+  if(found===0) out.innerHTML = `<div style="color:var(--muted);padding:8px">No matches</div>`;
+}
 
-        function getFileIcon(name) {
-            if (name.endsWith('.html')) return icons.html;
-            if (name.endsWith('.css')) return icons.css;
-            if (name.endsWith('.js')) return icons.js;
-            if (name.endsWith('.qml')) return icons.qml;
-            return icons.generic;
-        }
-
-        // Environment Config Handlers
-        function toggleTheme(mode) {
-            const isLight = mode === 'light';
-            document.body.classList.toggle('light-mode', isLight);
-            if (isAceActive) {
-                editorInstance.setTheme(isLight ? "ace/theme/chrome" : "ace/theme/tomorrow_night_eighties");
-            }
-        }
-
-        function toggleLiveMode(enabled) {
-            isLiveMode = enabled;
-            if (isLiveMode) runCode();
-        }
-
-        function toggleWordWrap(enabled) {
-            if (isAceActive) editorInstance.session.setUseWrapMode(enabled);
-            else {
-                const el = document.getElementById('fallback-textarea');
-                if (el) el.style.whiteSpace = enabled ? 'pre-wrap' : 'pre';
-            }
-        }
-
-        function changeFontSize(size) {
-            if (isAceActive) editorInstance.setFontSize(size);
-            else {
-                const el = document.getElementById('fallback-textarea');
-                if (el) el.style.fontSize = size;
-            }
-        }
-
-        // Initialize Ace System or Core Fallback Engine
-        try {
-            if (typeof ace !== 'undefined') {
-                editorInstance = ace.edit("editor");
-                editorInstance.setTheme("ace/theme/tomorrow_night_eighties");
-                editorInstance.setOptions({
-                    fontSize: "14px",
-                    showPrintMargin: false,
-                    enableBasicAutocompletion: true,
-                    enableLiveAutocompletion: true
-                });
-                isAceActive = true;
-                systemLog("System Core: Advanced Editor loaded.");
-            } else throw new Error("Ace library blocked or offline");
-        } catch (e) {
-            document.getElementById('editor').innerHTML = '<textarea id="fallback-textarea" spellcheck="false"></textarea>';
-            editorInstance = {
-                getValue: () => document.getElementById('fallback-textarea').value,
-                setValue: (val) => document.getElementById('fallback-textarea').value = val,
-                session: { setMode: () => {}, setUseWrapMode: () => {} }
-            };
-            systemLog("Environment Isolation: Script execution blocked. Fallback operational.");
-        }
-
-        function handleEditorChange() {
-            const activeFile = files.find(f => f.id === activeFileId);
-            if (activeFile && editorInstance) activeFile.content = editorInstance.getValue();
-            safeSetItem('ide_files', JSON.stringify(files));
-            
-            if (isLiveMode) {
-                clearTimeout(buildDebounce);
-                buildDebounce = setTimeout(runCode, 600);
-            }
-        }
-
-        if (isAceActive) editorInstance.on("change", handleEditorChange);
-        else {
-            const el = document.getElementById('fallback-textarea');
-            if (el) el.addEventListener('input', handleEditorChange);
-        }
-
-        // Core Synchronization Registry
-        function syncState() {
-            const activeFile = files.find(f => f.id === activeFileId);
-            if (activeFile && editorInstance) activeFile.content = editorInstance.getValue();
-            safeSetItem('ide_files', JSON.stringify(files));
-            safeSetItem('ide_active_file', activeFileId);
-            const status = document.getElementById('save-status');
-            if (status) {
-                status.innerText = "Saved";
-                setTimeout(() => { status.innerText = "Synced"; }, 1000);
-            }
-        }
-
-        // Tab Management Engine
-        function renderTabs() {
-            const container = document.getElementById('tabs-container');
-            container.innerHTML = '';
-            
-            files.forEach((file) => {
-                const tab = document.createElement('div');
-                tab.className = 'tab' + (file.id === activeFileId ? ' active' : '');
-                tab.dataset.id = file.id;
-                
-                const iconWrapper = document.createElement('span');
-                iconWrapper.style.display = 'flex';
-                iconWrapper.innerHTML = getFileIcon(file.name);
-
-                const nameSpan = document.createElement('span');
-                nameSpan.innerText = file.name;
-                nameSpan.onclick = () => switchTab(file.id);
-                
-                const closeBtn = document.createElement('div');
-                closeBtn.className = 'close-tab';
-                closeBtn.innerHTML = icons.close;
-                closeBtn.onclick = (e) => { e.stopPropagation(); closeTab(file.id); };
-
-                tab.appendChild(iconWrapper);
-                tab.appendChild(nameSpan);
-                tab.appendChild(closeBtn);
-                setupDraggableTab(tab, file.id);
-                container.appendChild(tab);
-            });
-        }
-
-        function switchTab(id) {
-            syncState();
-            activeFileId = id;
-            const newFile = files.find(f => f.id === id);
-            
-            if (isAceActive) {
-                let mode = 'text';
-                if (newFile.type === 'html' || newFile.name.endsWith('.html')) mode = 'html';
-                else if (newFile.type === 'css' || newFile.name.endsWith('.css')) mode = 'css';
-                else if (newFile.type === 'javascript' || newFile.name.endsWith('.js')) mode = 'javascript';
-                else if (newFile.type === 'qml' || newFile.name.endsWith('.qml')) mode = 'qml';
-                
-                editorInstance.session.setMode("ace/mode/" + mode);
-                editorInstance.setValue(newFile.content, -1);
-            } else {
-                editorInstance.setValue(newFile.content);
-            }
-            renderTabs();
-            safeSetItem('ide_active_file', activeFileId);
-        }
-
-        function promptNewTab() {
-            const name = prompt("Enter complete filename (e.g. App.qml):", "Component.qml");
-            if (!name) return;
-            const newId = 'f' + Date.now();
-            let type = 'text';
-            if (name.endsWith('.html')) type = 'html';
-            else if (name.endsWith('.css')) type = 'css';
-            else if (name.endsWith('.js')) type = 'javascript';
-            else if (name.endsWith('.qml')) type = 'qml';
-            
-            files.push({ id: newId, name: name, type: type, content: '' });
-            switchTab(newId);
-        }
-
-        function closeTab(id) {
-            if (files.length <= 1) return alert("System core restriction: Active workspace requires 1 minimum tab.");
-            files = files.filter(f => f.id !== id);
-            if (activeFileId === id) switchTab(files[0].id);
-            else renderTabs();
-            syncState();
-        }
-
-        function setupDraggableTab(tabElement, fileId) {
-            const handleStart = (e) => {
-                if(e.target.closest('.close-tab')) return;
-                tabElement.classList.add('dragging');
-            };
-            const handleMove = (e) => {
-                if(!tabElement.classList.contains('dragging')) return;
-                e.preventDefault(); 
-                const clientX = e.type.includes('mouse') ? e.pageX : e.touches[0].pageX;
-                const container = document.getElementById('tabs-container');
-                const tabs = Array.from(container.querySelectorAll('.tab:not(.dragging)'));
-                
-                let nextElement = null;
-                for(let sibling of tabs) {
-                    const rect = sibling.getBoundingClientRect();
-                    if(clientX < rect.left + rect.width / 2) {
-                        nextElement = sibling;
-                        break;
-                    }
-                }
-                if (nextElement) container.insertBefore(tabElement, nextElement);
-                else container.appendChild(tabElement);
-            };
-            const handleEnd = (e) => {
-                if(!tabElement.classList.contains('dragging')) return;
-                tabElement.classList.remove('dragging');
-                const newDOMOrder = Array.from(document.getElementById('tabs-container').children);
-                files.sort((a, b) => {
-                    return newDOMOrder.findIndex(el => el.dataset.id === a.id) - 
-                           newDOMOrder.findIndex(el => el.dataset.id === b.id);
-                });
-                syncState();
-            };
-
-            tabElement.addEventListener('mousedown', handleStart);
-            document.addEventListener('mousemove', handleMove, { passive: false });
-            document.addEventListener('mouseup', handleEnd);
-        }
-
-        const consoleHijackScript = "<script>\n" +
-            "(function() {\n" +
-            "    const send = (type, args) => {\n" +
-            "        const parsedArgs = Array.from(args).map(arg => {\n" +
-            "            if(typeof arg === 'object') return JSON.stringify(arg);\n" +
-            "            return String(arg);\n" +
-            "        });\n" +
-            "        window.parent.postMessage({ source: 'live-preview', type: type, args: parsedArgs }, '*');\n" +
-            "    };\n" +
-            "    const ogLog = console.log, ogWarn = console.warn, ogErr = console.error;\n" +
-            "    console.log = function() { send('log', arguments); ogLog.apply(console, arguments); };\n" +
-            "    console.warn = function() { send('warn', arguments); ogWarn.apply(console, arguments); };\n" +
-            "    console.error = function() { send('error', arguments); ogErr.apply(console, arguments); };\n" +
-            "    window.onerror = function(msg, url, line) {\n" +
-            "        send('error', [msg + ' (Line ' + line + ')']);\n" +
-            "        return false;\n" +
-            "    };\n" +
-            "})();\n" +
-            "</scr" + "ipt>";
-
-        window.addEventListener('message', (event) => {
-            if(event.data && event.data.source === 'live-preview') {
-                const out = document.getElementById('console-output');
-                const logLine = document.createElement('div');
-                logLine.className = 'log-line log-' + event.data.type;
-                
-                // Keep html escaping here for displaying the logs safely in the console UI
-                const safeText = String(event.data.args.join(' ')).replace(/[&<>'"]/g, 
-                    tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag])
-                );
-                
-                logLine.innerHTML = '<span>&gt;&nbsp;</span><span>' + safeText + '</span>';
-                out.appendChild(logLine);
-                out.scrollTop = out.scrollHeight;
-            }
-        });
-
-        function clearConsole() {
-            document.getElementById('console-output').innerHTML = '';
-        }
-
-        function systemLog(msg, typeClass = 'log-system') {
-            const out = document.getElementById('console-output');
-            if(out) {
-                out.innerHTML += `<div class="log-line ${typeClass}">${msg}</div>`;
-                out.scrollTop = out.scrollHeight;
-            }
-        }
-
-        async function runCode() {
-            syncState();
-            clearConsole();
-            systemLog('System: Initiating build sequence...');
-
-            let htmlBase = '';
-            let cssBlock = '';
-            let jsBlock = '';
-            
-            let mainQmlFile = files.find(f => f.name === 'main.qml') || files.find(f => f.type === 'qml' || f.name.endsWith('.qml'));
-            let qmlBlock = '';
-
-            if (mainQmlFile) {
-                systemLog(`QML Engine: Targeting ${mainQmlFile.name} for rendering context.`);
-                // FIX: Do not escape HTML inside <script> tags. It breaks QML operators. Just escape closing script tags.
-                const safeQml = mainQmlFile.content.replace(/<\/script>/gi, "<\\/script>");
-                qmlBlock = `<script type="text/qml" id="qml-source-code">${safeQml}<\/script>`;
-            }
-
-            files.forEach(f => {
-                if(f.type === 'html' || f.name.endsWith('.html')) htmlBase += f.content + '\n';
-                if(f.type === 'css' || f.name.endsWith('.css')) cssBlock += f.content + '\n';
-                if(f.type === 'javascript' || f.name.endsWith('.js')) jsBlock += f.content + '\n';
-            });
-
-            const finalDocument = `
-<!DOCTYPE html>
-<html>
-<head>
-    <style>${cssBlock}</style>
-    <script type="text/javascript" src="qmlweb.js"><\/script>
-    ${consoleHijackScript}
-</head>
-<body style="margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: transparent;">
-    <div id="qml-root" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 10;"></div>
-    
-    <div id="html-layer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none;">
-        ${htmlBase}
-    </div>
-
-    ${qmlBlock}
-
-    <script>
-        window.addEventListener('load', function() {
-            var qmlScript = document.getElementById('qml-source-code');
-            if (qmlScript && typeof QmlWeb !== 'undefined') {
-                try {
-                    var engine = new QmlWeb.QMLEngine(document.getElementById('qml-root'));
-                    engine.loadQML(qmlScript.textContent);
-                    engine.start();
-                    console.log("QML Context Successfully Initialized");
-                } catch (e) {
-                    console.error("QML Runtime Exception: " + e.message);
-                }
-            } else if (qmlScript) {
-                console.error("Critical: QmlWeb library not loaded. Check CDN connection.");
-            }
-        });
-    <\/script>
-    <script>${jsBlock}<\/script>
-</body>
-</html>`;
-
-            document.getElementById('preview').srcdoc = finalDocument;
-        }
-
-        function exportFiles() {
-            syncState();
-            files.forEach(f => {
-                if (!f.content.trim()) return;
-                let mime = 'text/plain';
-                if (f.type === 'html') mime = 'text/html';
-                if (f.type === 'css') mime = 'text/css';
-                if (f.type === 'javascript') mime = 'text/javascript';
-                if (f.type === 'qml') mime = 'text/x-qml';
-
-                const blob = new Blob([f.content], { type: mime });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = f.name;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            });
-            systemLog('System Workspace Dump: All assets downloaded.');
-        }
-
-        // Startup Trigger
-        switchTab(activeFileId);
-        runCode();
-    </script>
+// ensure side is hidden by default and responsive on small screens
+side.style.display='none';
+document.getElementById('act-settings').addEventListener('click',openCmdPal);
+document.querySelectorAll('.out-tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('.out-tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active')})});
+document.getElementById('st-cur').addEventListener('click',doGoto);
+document.getElementById('st-lang').addEventListener('click',()=>{const tab=activeTab();if(!tab)return;const order=['python','shell','qml','javascript','htmlmixed','css'];tab.lang=order[(order.indexOf(tab.lang)+1)%order.length];tab.info=LANGS[tab.lang];const doc=CodeMirror.Doc(tab.doc.getValue(),tab.lang);tab.doc=doc;if(S.activeId===tab.id)S.editor.swapDoc(doc);renderTabs();updateStatus()});
+document.getElementById('btn-run').addEventListener('click',runCode);document.getElementById('btn-stop').addEventListener('click',stopExec);document.getElementById('btn-undo').addEventListener('click',doUndo);document.getElementById('btn-redo').addEventListener('click',doRedo);document.getElementById('btn-live').addEventListener('click',toggleLive);document.getElementById('btn-format').addEventListener('click',prettyPrint);document.getElementById('btn-wrap').addEventListener('click',toggleWrap);document.getElementById('btn-fold').addEventListener('click',foldAll);document.getElementById('btn-unfold').addEventListener('click',unfoldAll);document.getElementById('btn-find').addEventListener('click',doFind);document.getElementById('btn-replace').addEventListener('click',doReplace);document.getElementById('btn-goto').addEventListener('click',doGoto);document.getElementById('btn-comment').addEventListener('click',doComment);document.getElementById('btn-theme').addEventListener('click',toggleTheme);document.getElementById('btn-export').addEventListener('click',()=>openModal('export-modal'));document.getElementById('btn-cmd').addEventListener('click',openCmdPal);document.getElementById('btn-add-tab').addEventListener('click',openNewFile);
+document.getElementById('btn-prev-close').addEventListener('click',toggleLive);
+document.getElementById('btn-prev-refresh').addEventListener('click',updatePreview);
+document.getElementById('btn-prev-download').addEventListener('click',downloadFromPreview);
+document.getElementById('btn-out-clear').addEventListener('click',()=>setOutput(''));document.getElementById('btn-out-close').addEventListener('click',hideOutput);
+document.getElementById('nf-lang').addEventListener('change',e=>{const inp=document.getElementById('nf-name');const info=LANGS[e.target.value]||LANGS.python;if(inp.value.includes('.'))inp.value=inp.value.replace(/\.[^.]+$/,info.ext)});
+document.getElementById('nf-name').addEventListener('keydown',e=>{if(e.key==='Enter')createFile();if(e.key==='Escape')closeModal('new-modal')});
+document.getElementById('rn-name').addEventListener('keydown',e=>{if(e.key==='Enter')doRename();if(e.key==='Escape')closeModal('rename-modal')});
+document.getElementById('new-modal').addEventListener('click',e=>{if(e.target.id==='new-modal')closeModal('new-modal')});
+document.getElementById('rename-modal').addEventListener('click',e=>{if(e.target.id==='rename-modal')closeModal('rename-modal')});
+document.getElementById('export-modal').addEventListener('click',e=>{if(e.target.id==='export-modal')closeModal('export-modal')});
+document.addEventListener('keydown',e=>{if(e.ctrlKey&&e.shiftKey&&e.key==='P'){e.preventDefault();openCmdPal()}if(e.ctrlKey&&e.shiftKey&&e.key==='F'){e.preventDefault();prettyPrint()}if(e.ctrlKey&&e.key==='n'){e.preventDefault();openNewFile()}if(e.ctrlKey&&e.key==='s'){e.preventDefault();openModal('export-modal')}if(e.ctrlKey&&e.key==='w'){e.preventDefault();if(S.activeId)closeTab(S.activeId)}if(e.ctrlKey&&e.key==='b'){e.preventDefault();toggleLive()}if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();runCode()}if(e.key==='Escape'){closeCmdPal();closeModal('new-modal');closeModal('rename-modal');closeModal('export-modal');closeSheet();document.getElementById('ctx').style.display='none'}});
+function init(){initEditor();updateWelcome();updateStatus()}
+document.addEventListener('DOMContentLoaded',init);
+</script>
 </body>
 </html>
